@@ -35,7 +35,10 @@ const MOTE_MAX_SPEED = 360 // clamp so the field can't fling motes off to infini
 /** Reach of the ship's field, px. Exported so the view can draw the ring. */
 export const FIELD_RANGE = 260
 const FIELD_STRENGTH = 1100 // px/s^2 at the centre, falling linearly to 0 at the edge
-const VORTEX_PULL = 0.4 // vortex inward bias (fraction of the tangential force) so motes orbit instead of flinging off
+const VORTEX_RADIUS = FIELD_RANGE * 0.5 // motes settle onto this orbit shell in vortex mode
+const VORTEX_SWIRL = 240 // tangential orbit speed, px/s
+const VORTEX_SPRING = 3.5 // pull toward the shell radius, 1/s
+const VORTEX_RESPONSE = 6 // how fast a mote's velocity tracks the vortex target, 1/s
 
 function driftVel(rng: Rng, maxSpeed: number): Vec2 {
   const a = random(rng) * Math.PI * 2
@@ -136,17 +139,27 @@ function fieldMode(input: Input): FieldMode {
   return 'off'
 }
 
-// Field acceleration on a mote, given the unit vector (ux, uy) pointing FROM the mote
-// TOWARD the ship and a magnitude `mag`. attract = inward, repel = outward,
-// vortex = tangential (perpendicular) swirl plus a gentle inward bias so motes orbit.
+// Radial field acceleration for the two simple modes: attract = inward, repel = out.
+// (ux, uy) points from the mote toward the ship; `mag` already folds in the falloff.
 function fieldAccel(mode: FieldMode, ux: number, uy: number, mag: number): Vec2 {
-  if (mode === 'attract') return { x: ux * mag, y: uy * mag }
   if (mode === 'repel') return { x: -ux * mag, y: -uy * mag }
-  return { x: -uy * mag + ux * mag * VORTEX_PULL, y: ux * mag + uy * mag * VORTEX_PULL }
+  return { x: ux * mag, y: uy * mag }
 }
 
-// Drift a mote, apply the ship's polarity field (linear falloff over FIELD_RANGE),
-// clamp its speed, then move + spin it (wrapping).
+// Vortex steers a mote's velocity toward a rotating shell — a spring toward
+// VORTEX_RADIUS plus a tangential orbit speed — so motes circle the ship and stay
+// captured, instead of a constant tangential force spiralling them out of range.
+// (ux, uy) points from the mote toward the ship.
+function vortexVel(ux: number, uy: number, dist: number, vx: number, vy: number, dt: number): Vec2 {
+  const radialOut = VORTEX_SPRING * (VORTEX_RADIUS - dist) // +outward inside the shell, -inward outside
+  const targetX = -ux * radialOut + -uy * VORTEX_SWIRL // outward (-ux,-uy) + tangent (-uy, ux)
+  const targetY = -uy * radialOut + ux * VORTEX_SWIRL
+  const k = Math.min(1, VORTEX_RESPONSE * dt)
+  return { x: vx + (targetX - vx) * k, y: vy + (targetY - vy) * k }
+}
+
+// Drift a mote, apply the ship's polarity field, clamp its speed, then move + spin
+// it (wrapping).
 function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number): Asteroid {
   let vx = a.vel.x
   let vy = a.vel.y
@@ -155,10 +168,18 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
     const dy = ship.pos.y - a.pos.y
     const dist = Math.hypot(dx, dy)
     if (dist > 0 && dist < FIELD_RANGE) {
-      const mag = FIELD_STRENGTH * (1 - dist / FIELD_RANGE) * dt
-      const acc = fieldAccel(ship.field, dx / dist, dy / dist, mag)
-      vx += acc.x
-      vy += acc.y
+      const ux = dx / dist
+      const uy = dy / dist
+      if (ship.field === 'vortex') {
+        const v = vortexVel(ux, uy, dist, vx, vy, dt)
+        vx = v.x
+        vy = v.y
+      } else {
+        const mag = FIELD_STRENGTH * (1 - dist / FIELD_RANGE) * dt
+        const acc = fieldAccel(ship.field, ux, uy, mag)
+        vx += acc.x
+        vy += acc.y
+      }
     }
   }
   const speed = Math.hypot(vx, vy)
