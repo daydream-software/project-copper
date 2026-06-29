@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "suno-song-creator@suno-tools": true,
+    "suno-upload@suno-tools": true
+  }
+}

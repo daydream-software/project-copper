@@ -1,0 +1,46 @@
+# CLAUDE.md
+
+Guidance for working in this repo. Keep it short — details live in `docs/`.
+
+## What this is
+
+**Project Copper** — a tiny **vector arena** (Asteroids-lineage): a triangle ship in
+a wrapping field of drifting polygons that **split** when shot. **Purely geometric**:
+everything is stroked vector paths drawn in code — **no image/audio/font assets**. It
+starts as a **sandbox toy** and is meant to **grow over time**. Deliberately simpler
+than our other game attempts; we are **not** carrying over their "programmable brain"
+ADN. See `docs/VISION.md` (north star) and `docs/ROADMAP.md` (build order).
+
+## Stack & commands
+
+TypeScript · Vite · Canvas 2D · Vitest. **No runtime dependencies.**
+
+- `npm run dev` — dev server; open **http://127.0.0.1.nip.io:5173** (the workspace's
+  `*.nip.io` dev-host convention)
+- `npm test` — Vitest (unit tests on the pure simulation)
+- `npm run lint` — ESLint (`eslint-config-love`)
+- `npm run build` — `tsc` typecheck + `eslint .` + production build into `dist/`
+- `npm run preview` — serve the production build
+
+## Conventions (non-negotiable)
+
+- **English** in every project artifact: code, comments, UI strings, docs, commits.
+  (Conversation may be in French; the repo is English.)
+- **Conventional Commits** — `type(scope): subject`, imperative lower-case. See
+  `CONTRIBUTING.md`.
+- **GitHub Pages:** keep `base: './'` in `vite.config.ts` so asset paths stay
+  relative; `deploy.yml` builds and pushes `dist/` to the `gh-pages` branch (the org
+  enforces SHA-pinned actions). Pushes to `main` auto-deploy.
+
+## How we work
+
+- Build in **tiny verified slices**; attack the riskiest unknown first.
+- **Prove changes by running the app** (browser screenshot), not by green tests
+  alone. Tests must fail when logic breaks — cover boundaries, and mutation-check
+  (flip the logic, see red, restore).
+- Keep the simulation in `src/sim.ts` as **pure, deterministic** functions; the
+  renderer (`src/render.ts`) is a pure view. Use the **seeded** PRNG (`src/rng.ts`)
+  for any randomness so an arena (a seed) is reproducible and the sim is testable.
+- **No assets.** Anything drawn is a vector path in code. If a slice seems to need an
+  image/sound, reach for geometry first (audio is a possible future slice — the
+  workspace `suno-songs/` folder — but not now).

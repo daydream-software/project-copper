@@ -1,0 +1,45 @@
+/* Copper-on-black, full-bleed. Everything else is drawn on the canvas in code. */
+:root {
+  --copper: #d98a44;
+  --copper-dim: #b87333;
+  --bg: #0a0a0a;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--copper-dim);
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  overflow: hidden;
+}
+
+main {
+  display: grid;
+  place-items: center;
+  gap: 0.75rem;
+  min-height: 100%;
+  padding: 1rem;
+}
+
+#game {
+  display: block;
+  max-width: 100%;
+  max-height: 80vh;
+  border: 1px solid color-mix(in srgb, var(--copper-dim) 35%, transparent);
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+#hint {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  user-select: none;
+}
