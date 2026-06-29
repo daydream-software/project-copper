@@ -4,6 +4,7 @@
 
 import { makeRng, random, range, type Rng } from './rng'
 import { makeShape, overlap, wrap, type Vec2 } from './geometry'
+import { DEFAULT_CONFIG, type Config } from './config'
 import type { Asteroid, Bullet, FieldMode, Input, Ship, World } from './entities'
 
 // --- Ship ---
@@ -47,6 +48,7 @@ const CHARGE_TIME = 1.4 // seconds of held vortex to reach full charge
 export const PULSE_RANGE = 300
 const PULSE_STRENGTH = 380 // inward velocity kick at the centre, px/s (linear falloff to 0 at the edge)
 const MOTE_CHARGE_TIME = 2.5 // seconds a mote stays "charged" after the field touches it
+const MAX_MOTES = 80 // safety cap so a chain reaction can't explode the field unboundedly
 
 function driftVel(rng: Rng, maxSpeed: number): Vec2 {
   const a = random(rng) * Math.PI * 2
@@ -80,7 +82,7 @@ function spawnAsteroid(rng: Rng, width: number, height: number, radius: number, 
   }
 }
 
-function spawnChild(rng: Rng, parent: Asteroid): Asteroid {
+function spawnChild(rng: Rng, parent: Asteroid, childCharge: number): Asteroid {
   const a = random(rng) * Math.PI * 2
   const kick = ASTEROID_DRIFT * 0.8
   return {
@@ -90,7 +92,7 @@ function spawnChild(rng: Rng, parent: Asteroid): Asteroid {
     angle: random(rng) * Math.PI * 2,
     spin: (random(rng) * 2 - 1) * ASTEROID_MAX_SPIN,
     shape: makeShape(rng, range(rng, ASTEROID_POINTS_MIN, ASTEROID_POINTS_MAX)),
-    charge: 0,
+    charge: childCharge,
   }
 }
 
@@ -115,7 +117,7 @@ export function createWorld(seed: number, width: number, height: number): World 
 
 // Turn, thrust, drag, clamp, then move (wrapping). Decrements the fire cooldown but
 // does not arm it — firing (which creates a bullet) is the caller's job.
-function stepShip(ship: Ship, input: Input, width: number, height: number, dt: number): Ship {
+function stepShip(ship: Ship, input: Input, width: number, height: number, dt: number, config: Config): Ship {
   const turn = (input.turnLeft ? -1 : 0) + (input.turnRight ? 1 : 0)
   const angle = ship.angle + turn * TURN_RATE * dt
   let vx = ship.vel.x
@@ -134,7 +136,7 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
   }
   // Charge builds while the vortex is held, and resets the moment it's released —
   // releasing/scattering then flings the motes at whatever orbit speed was wound up.
-  const field = fieldMode(input)
+  const field = fieldMode(input, config)
   const charge = field === 'vortex' ? Math.min(1, ship.charge + dt / CHARGE_TIME) : 0
   return {
     pos: { x: wrap(ship.pos.x + vx * dt, width), y: wrap(ship.pos.y + vy * dt, height) },
@@ -148,11 +150,13 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
   }
 }
 
-// Which continuous field is active this step. Both gather+scatter held = vortex;
-// scatter alone = repel; otherwise off. (Gather alone is a discrete pulse, not here.)
-function fieldMode(input: Input): FieldMode {
-  if (input.attract && input.repel) return 'vortex'
-  if (input.repel) return 'repel'
+// Which continuous field is active this step, gated by the sandbox config. Both held =
+// vortex; continuous-attract (if gather is set to it); scatter alone = repel; else off.
+// (When gather is `pulse`, gather is a discrete impulse handled outside this function.)
+function fieldMode(input: Input, config: Config): FieldMode {
+  if (input.attract && input.repel && config.vortex) return 'vortex'
+  if (input.attract && config.gather === 'attract') return 'attract'
+  if (input.repel && config.scatter) return 'repel'
   return 'off'
 }
 
@@ -200,10 +204,10 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
         vx = v.x
         vy = v.y
       } else {
-        // 'repel' (scatter): radial outward.
-        const mag = FIELD_STRENGTH * (1 - dist / FIELD_RANGE) * dt
-        vx -= ux * mag
-        vy -= uy * mag
+        // 'attract' = radial inward (ux,uy point at the ship); 'repel' = outward.
+        const mag = FIELD_STRENGTH * (1 - dist / FIELD_RANGE) * dt * (ship.field === 'attract' ? 1 : -1)
+        vx += ux * mag
+        vy += uy * mag
       }
     }
   }
@@ -241,15 +245,19 @@ function findMoteSplits(motes: Asteroid[]): { split: Set<number>, discharge: Set
   return { split, discharge }
 }
 
-function resolveMoteCollisions(rng: Rng, motes: Asteroid[]): Asteroid[] {
+function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Asteroid[] {
+  if (motes.length >= MAX_MOTES) return motes // safety valve: stop splitting (chain guard)
   const { split, discharge } = findMoteSplits(motes)
+  const childCharge = config.chainReaction ? MOTE_CHARGE_TIME : 0 // fragments born charged → cascade
   const out: Asteroid[] = []
   for (const [idx, m] of motes.entries()) {
     if (split.has(idx)) {
-      if (m.radius > ASTEROID_MIN_RADIUS) out.push(spawnChild(rng, m), spawnChild(rng, m))
+      if (m.radius > ASTEROID_MIN_RADIUS) out.push(spawnChild(rng, m, childCharge), spawnChild(rng, m, childCharge))
       // else: destroyed at min size (same as a bullet hit)
     } else {
-      out.push(discharge.has(idx) ? { ...m, charge: 0 } : m)
+      // piercing: a charger keeps its charge instead of discharging.
+      const keep = !discharge.has(idx) || config.piercing
+      out.push(keep ? m : { ...m, charge: 0 })
     }
   }
   return out
@@ -299,7 +307,7 @@ function resolveCollisions(rng: Rng, bullets: Bullet[], asteroids: Asteroid[]): 
       if (!overlap(b.pos, BULLET_RADIUS, a.pos, a.radius)) continue
       usedBullet.add(bi)
       hitAsteroid.add(ai)
-      if (a.radius > ASTEROID_MIN_RADIUS) spawned.push(spawnChild(rng, a), spawnChild(rng, a))
+      if (a.radius > ASTEROID_MIN_RADIUS) spawned.push(spawnChild(rng, a, 0), spawnChild(rng, a, 0))
       break
     }
   }
@@ -309,23 +317,25 @@ function resolveCollisions(rng: Rng, bullets: Bullet[], asteroids: Asteroid[]): 
   }
 }
 
-/** Advance the world one fixed timestep. Pure: returns a new world. */
-export function step(world: World, input: Input, dt: number): World {
+/** Advance the world one fixed timestep. Pure: returns a new world. `config` selects
+ * sandbox behaviour; it defaults to the shipped behaviour so existing callers are
+ * unaffected. */
+export function step(world: World, input: Input, dt: number, config: Config = DEFAULT_CONFIG): World {
   const rng = makeRng(world.rngState)
-  const ship = stepShip(world.ship, input, world.width, world.height, dt)
+  const ship = stepShip(world.ship, input, world.width, world.height, dt, config)
 
-  // Advance bullets, then fire (arming the cooldown) if the trigger is held.
+  // Advance bullets, then fire (arming the cooldown) if the gun is enabled and triggered.
   const flying = advanceBullets(world.bullets, world.width, world.height, dt)
-  const firing = input.fire && ship.fireCooldown <= 0
+  const firing = config.gun && input.fire && ship.fireCooldown <= 0
   const bullets = firing ? [...flying, makeBullet(ship, world.width, world.height)] : flying
   const armed: Ship = firing ? { ...ship, fireCooldown: FIRE_COOLDOWN } : ship
 
   // A gather pulse yanks motes inward first (a one-shot velocity kick), then the
   // continuous field + drift + spin + wrap, then charged↔uncharged mote splits, and
-  // finally any (dormant) bullet hits.
+  // finally any bullet hits.
   const kicked = input.pulse ? world.asteroids.map((a) => pulseKick(a, ship.pos)) : world.asteroids
   const moved: Asteroid[] = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt))
-  const reacted = resolveMoteCollisions(rng, moved)
+  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, moved, config) : moved
   const hit = resolveCollisions(rng, bullets, reacted)
 
   // Keep the field populated (no game-over yet: it's a sandbox).

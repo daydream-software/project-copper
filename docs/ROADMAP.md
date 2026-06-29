@@ -36,11 +36,20 @@ fragments (reusing the bullet-hit split + `spawnChild`), discharging itself. Clo
 loop **gather → charge → fling → shatter**. (`sim.ts` `findMoteSplits` /
 `resolveMoteCollisions`; mote `charge` in `entities.ts`; brighter render in `drawAsteroids`.)
 
+### Slice S — the sandbox options panel (done)
+
+A floating panel (`index.html` / `style.css`, wired in `main.ts`) toggles mechanics
+live via a `Config` (`config.ts`) passed to `step(world, input, dt, config)` —
+`DEFAULT_CONFIG` is the shipped behaviour so the default arg keeps existing callers
+unchanged. Toggles: gather **pulse vs continuous attract**, **scatter**, **vortex**,
+the **gun** (press F — the dormant bullets, re-enabled), **charged-mote split**,
+**piercing** (chargers keep their charge), **chain reaction** (fragments born charged,
+bounded by `MAX_MOTES`), plus **reseed**. Every toggle has a discriminating unit test.
+
 ## Next — the open ladder (not built yet)
 
-5. **Sandbox knobs.** Live-tune field range / strength / vortex bias / mote count /
-   seed. The payoff of "it's a sandbox." *Riskiest part: a clean knobs→constants
-   wiring that doesn't pollute the pure sim.*
+5. **Numeric knobs.** Sliders for field range / strength / vortex bias / charge time /
+   mote count, on top of the toggle panel.
 6. **Field / charge mods (the Nova-Drift-flavoured depth).** A first modular upgrade —
    e.g. extra reach, a vortex that flings motes on release, motes that bind into
    chains. Asset-free: behaviour + stats + geometry.

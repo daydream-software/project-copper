@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld, step } from './sim'
 import { overlap, wrap } from './geometry'
+import { DEFAULT_CONFIG, type Config } from './config'
 import type { Input, World } from './entities'
 
 const DT = 1 / 120
@@ -9,6 +10,8 @@ const NONE: Input = { thrust: false, turnLeft: false, turnRight: false, attract:
 function press(over: Partial<Input>): Input {
   return { ...NONE, ...over }
 }
+
+const cfg = (over: Partial<Config> = {}): Config => ({ ...DEFAULT_CONFIG, ...over })
 
 // A mote (drifting polygon) for field tests; shape is irrelevant to the sim.
 const mote = (x: number, vx: number) => ({ pos: { x, y: 300 }, vel: { x: vx, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 0 })
@@ -88,17 +91,21 @@ describe('ship', () => {
   })
 })
 
-describe('firing', () => {
-  it('spawns one upward bullet and arms the cooldown', () => {
-    const w = step(makeWorld(), press({ fire: true }), DT)
+describe('firing (gun)', () => {
+  it('spawns one upward bullet and arms the cooldown when the gun is on', () => {
+    const w = step(makeWorld(), press({ fire: true }), DT, cfg({ gun: true }))
     expect(w.bullets).toHaveLength(1)
     expect(w.bullets[0].vel.y).toBeLessThan(0)
     expect(w.bullets[0].ttl).toBeGreaterThan(0)
     expect(w.ship.fireCooldown).toBeGreaterThan(0)
   })
 
+  it('does not fire when the gun is disabled (the default)', () => {
+    expect(step(makeWorld(), press({ fire: true }), DT).bullets).toHaveLength(0)
+  })
+
   it('refuses to fire while the cooldown is up', () => {
-    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0.1, thrusting: false, field: 'off', charge: 0, pulseT: 99 } }), press({ fire: true }), DT)
+    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0.1, thrusting: false, field: 'off', charge: 0, pulseT: 99 } }), press({ fire: true }), DT, cfg({ gun: true }))
     expect(w.bullets).toHaveLength(0)
   })
 
@@ -190,6 +197,30 @@ describe('charged-mote collisions', () => {
   it('two uncharged motes do not split each other', () => {
     const w = step(makeWorld({ asteroids: [moteAt(300, 300, 48, 0), moteAt(300, 300, 48, 0)] }), NONE, DT)
     expect(w.asteroids.filter((a) => a.radius < 40)).toHaveLength(0)
+  })
+})
+
+describe('sandbox config', () => {
+  const contact = () => [moteAt(300, 300, 48, 2), moteAt(300, 300, 48, 0)] // a charger overlapping an uncharged mote
+
+  it('gather=attract applies a continuous inward pull (no pulse needed)', () => {
+    const w = step(makeWorld({ asteroids: [mote(500, 0)] }), press({ attract: true }), DT, cfg({ gather: 'attract' }))
+    expect(w.asteroids[0].vel.x).toBeLessThan(0)
+  })
+
+  it('chargedSplit=false leaves a charged+uncharged contact intact', () => {
+    const w = step(makeWorld({ asteroids: contact() }), NONE, DT, cfg({ chargedSplit: false }))
+    expect(w.asteroids.filter((a) => a.radius < 40)).toHaveLength(0)
+  })
+
+  it('piercing=true keeps the charger charged after a hit', () => {
+    const w = step(makeWorld({ asteroids: contact() }), NONE, DT, cfg({ piercing: true }))
+    expect(w.asteroids[0].charge).toBeGreaterThan(0) // charger (idx 0) did not discharge
+  })
+
+  it('chainReaction=true spawns charged fragments', () => {
+    const w = step(makeWorld({ asteroids: contact() }), NONE, DT, cfg({ chainReaction: true }))
+    expect(w.asteroids.find((a) => a.radius < 40)?.charge ?? 0).toBeGreaterThan(0)
   })
 })
 

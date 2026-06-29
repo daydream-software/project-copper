@@ -6,9 +6,10 @@ import type { Vec2 } from './geometry'
 /**
  * The polarity field's continuous mode this step:
  * - `repel` (scatter, radial out) · `vortex` (both held: motes orbit a shell) · `off`
- * (Gathering is now a discrete `pulse`, not a continuous mode — see Input.)
+ * - `attract` (radial in) — only when the sandbox sets gather to continuous-attract;
+ *   the default gather is a discrete `pulse` (see Input), not a field mode.
  */
-export type FieldMode = 'off' | 'repel' | 'vortex'
+export type FieldMode = 'attract' | 'off' | 'repel' | 'vortex'
 
 export interface Ship {
   pos: Vec2

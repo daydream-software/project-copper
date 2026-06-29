@@ -16,6 +16,22 @@
       <canvas id="game" width="960" height="600"></canvas>
       <p id="hint">↑ thrust · ← → turn · tap space = gather pulse · shift = scatter · hold space+shift = vortex (charge, then release to fling)</p>
     </main>
+
+    <aside id="panel">
+      <h2>Sandbox</h2>
+      <fieldset>
+        <legend>Gather</legend>
+        <label><input type="radio" name="gather" value="pulse" checked /> Pulse</label>
+        <label><input type="radio" name="gather" value="attract" /> Attract (hold)</label>
+      </fieldset>
+      <label><input type="checkbox" id="opt-scatter" checked /> Scatter</label>
+      <label><input type="checkbox" id="opt-vortex" checked /> Vortex</label>
+      <label><input type="checkbox" id="opt-gun" /> Gun (press F)</label>
+      <label><input type="checkbox" id="opt-chargedSplit" checked /> Charged motes split</label>
+      <label><input type="checkbox" id="opt-piercing" /> Piercing (charge persists)</label>
+      <label><input type="checkbox" id="opt-chainReaction" /> Chain reaction</label>
+      <button id="opt-reseed" type="button">⟳ Reseed</button>
+    </aside>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

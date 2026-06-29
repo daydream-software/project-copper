@@ -43,3 +43,74 @@ main {
   opacity: 0.6;
   user-select: none;
 }
+
+/* Sandbox options panel — floats over the canvas, top-left. */
+#panel {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.8rem;
+  color: var(--copper);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--copper-dim) 40%, transparent);
+  border-radius: 6px;
+  backdrop-filter: blur(2px);
+  user-select: none;
+}
+
+#panel h2 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 0.15rem;
+}
+
+#panel fieldset {
+  border: 1px solid color-mix(in srgb, var(--copper-dim) 25%, transparent);
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+#panel legend {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  opacity: 0.65;
+  padding: 0 0.3rem;
+}
+
+#panel label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+#panel input {
+  accent-color: var(--copper);
+  cursor: pointer;
+}
+
+#panel button {
+  margin-top: 0.3rem;
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--copper);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--copper-dim) 45%, transparent);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#panel button:hover {
+  background: color-mix(in srgb, var(--copper) 15%, transparent);
+}

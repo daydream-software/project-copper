@@ -40,6 +40,9 @@ export function createInput(target: Window): InputHandle {
       case 'Shift':
         state.repel = down
         break
+      case 'f':
+        state.fire = down // only acts when the sandbox enables the gun
+        break
       default:
         return
     }
