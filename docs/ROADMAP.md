@@ -4,32 +4,41 @@
 > order** — tiny verified slices, riskiest unknown first, each proven by running the
 > app (not by green tests alone).
 
-## Done — the init (slices 0–4): a playable vector arena
+## Done
+
+### Slices 0–4 — the vector-arena core (now the substrate)
 
 - **0 · Skeleton.** Canvas, fixed-timestep loop, pure sim/view split, seeded PRNG,
   one passing test, gh-pages deploy stub. (`loop.ts`, `rng.ts`, `geometry.ts`,
   `entities.ts`, `main.ts`)
 - **1 · Ship.** Thrust + rotate + drag + screen-wrap. (`sim.ts`, `input.ts`,
   `render.ts`)
-- **2 · Firing.** Bullets from the nose, ship-relative velocity, ttl, wrap, cooldown.
-- **3 · Asteroids.** Seeded convex polygons drift + spin + wrap (vertices from `rng`,
-  no assets).
-- **4 · Collision + split.** Bullet × asteroid → splits into two smaller children, or
-  is destroyed at minimum radius; the field tops itself back up.
+- **2 · Firing.** Bullets from the nose, ttl, wrap, cooldown. **Now dormant** (code
+  intact, no key bound) after the polarity pivot.
+- **3 · Motes.** Seeded convex polygons drift + spin + wrap (vertices from `rng`).
+- **4 · Collision + split.** Bullet × mote → split into two, or destroy at min size;
+  field tops itself up. (Dormant with firing.)
+
+### Slice P — the polarity pivot (the game's verb)
+
+You're a charged point; you **bend the field** instead of shooting. Three modes with
+linear falloff: **gather** (attract), **scatter** (repel), **vortex** (both held —
+tangential swirl + gentle inward bias, so it's interesting, not a cancellation).
+View: reach ring (solid / dashed / dotted) + tethers. (`sim.ts` `stepMote` /
+`fieldMode` / `fieldAccel`, `render.ts` `drawField`, `input.ts`.)
 
 ## Next — the open ladder (not built yet)
 
-5. **Sandbox knobs.** A tiny on-screen panel to live-tune thrust / drag / drift /
-   spawn-count / seed. The payoff of "it's a sandbox": play with the rules in real
-   time. *Riskiest part: a clean knobs→constants wiring that doesn't pollute the
-   pure sim.*
-6. **Make it a game (optional).** Ship × asteroid collision, then lives, score and a
-   game-over/restart. Flip from "toy" to "game" deliberately.
-7. **Juice & variety.** Line-debris particles on a split, thrust trail, a brief
-   screen-shake; then enemy shapes, weapon variants, waves.
-8. **Themes.** Alternate geometric palettes (still copper by default).
-9. **Audio (much later).** Synth or short loops via the workspace `suno-songs/`
-   folder. The first sound is a slice of its own.
+5. **Sandbox knobs.** Live-tune field range / strength / vortex bias / mote count /
+   seed. The payoff of "it's a sandbox." *Riskiest part: a clean knobs→constants
+   wiring that doesn't pollute the pure sim.*
+6. **Field / charge mods (the Nova-Drift-flavoured depth).** A first modular upgrade —
+   e.g. extra reach, a vortex that flings motes on release, motes that bind into
+   chains. Asset-free: behaviour + stats + geometry.
+7. **Make it a game (optional).** Ship × mote collision, lives, score, runs.
+8. **Juice & variety.** Line-debris, mote types, hazards, waves, palette themes; maybe
+   revive the dormant **shot** as a second verb (Nova Drift keeps both).
+9. **Audio (much later).** Via the workspace `suno-songs/` folder.
 
 ## Method
 

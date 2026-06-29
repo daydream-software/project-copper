@@ -9,7 +9,9 @@ export interface InputHandle {
 }
 
 export function createInput(target: Window): InputHandle {
-  const state: Input = { thrust: false, turnLeft: false, turnRight: false, fire: false }
+  // `fire` stays in the intent but no key is bound to it — the bullet/split
+  // mechanic is dormant while we feel out the polarity field.
+  const state: Input = { thrust: false, turnLeft: false, turnRight: false, attract: false, repel: false, fire: false }
 
   const apply = (e: KeyboardEvent, down: boolean): void => {
     switch (e.key) {
@@ -18,15 +20,16 @@ export function createInput(target: Window): InputHandle {
         state.thrust = down
         break
       case 'ArrowLeft':
-      case 'a':
         state.turnLeft = down
         break
       case 'ArrowRight':
-      case 'd':
         state.turnRight = down
         break
       case ' ':
-        state.fire = down
+        state.attract = down
+        break
+      case 'Shift':
+        state.repel = down
         break
       default:
         return

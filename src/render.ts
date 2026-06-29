@@ -2,7 +2,8 @@
 // game logic, no allocation of game state — it only reads the world and writes the
 // canvas. Everything is geometry; there are no image assets.
 
-import type { World } from './entities'
+import { FIELD_RANGE } from './sim'
+import type { FieldMode, World } from './entities'
 
 const BG = '#0a0a0a'
 const COPPER = '#d98a44'
@@ -14,9 +15,46 @@ export function draw(ctx: CanvasRenderingContext2D, world: World): void {
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 
+  drawField(ctx, world)
   drawAsteroids(ctx, world)
   drawBullets(ctx, world)
   drawShip(ctx, world)
+}
+
+// Reach-ring dash pattern per mode: attract solid, repel dashed, vortex dotted.
+function ringDash(mode: FieldMode): number[] {
+  if (mode === 'repel') return [6, 9]
+  if (mode === 'vortex') return [2, 8]
+  return []
+}
+
+// The polarity field: faint tethers to the motes in reach, plus the reach ring
+// (solid = attract, dashed = repel, dotted = vortex). Drawn under the motes and ship.
+function drawField(ctx: CanvasRenderingContext2D, world: World): void {
+  const { ship } = world
+  if (ship.field === 'off') return
+  ctx.strokeStyle = ship.field === 'repel' ? COPPER_DIM : COPPER
+
+  ctx.lineWidth = 1
+  ctx.globalAlpha = 0.3
+  for (const a of world.asteroids) {
+    const dx = a.pos.x - ship.pos.x
+    const dy = a.pos.y - ship.pos.y
+    if (dx * dx + dy * dy < FIELD_RANGE * FIELD_RANGE) {
+      ctx.beginPath()
+      ctx.moveTo(ship.pos.x, ship.pos.y)
+      ctx.lineTo(a.pos.x, a.pos.y)
+      ctx.stroke()
+    }
+  }
+  ctx.globalAlpha = 1
+
+  ctx.lineWidth = 1.5
+  ctx.setLineDash(ringDash(ship.field))
+  ctx.beginPath()
+  ctx.arc(ship.pos.x, ship.pos.y, FIELD_RANGE, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.setLineDash([])
 }
 
 function drawAsteroids(ctx: CanvasRenderingContext2D, world: World): void {

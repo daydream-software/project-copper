@@ -4,7 +4,7 @@ import { overlap, wrap } from './geometry'
 import type { Input, World } from './entities'
 
 const DT = 1 / 120
-const NONE: Input = { thrust: false, turnLeft: false, turnRight: false, fire: false }
+const NONE: Input = { thrust: false, turnLeft: false, turnRight: false, attract: false, repel: false, fire: false }
 
 function press(over: Partial<Input>): Input {
   return { ...NONE, ...over }
@@ -14,7 +14,7 @@ function makeWorld(over: Partial<World> = {}): World {
   return {
     width: 800,
     height: 600,
-    ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false },
+    ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' },
     bullets: [],
     asteroids: [],
     rngState: 12345,
@@ -67,7 +67,7 @@ describe('ship', () => {
   })
 
   it('drag bleeds velocity when coasting', () => {
-    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 100, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false } }), NONE, DT)
+    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 100, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' } }), NONE, DT)
     expect(w.ship.vel.x).toBeGreaterThan(0)
     expect(w.ship.vel.x).toBeLessThan(100)
   })
@@ -83,13 +83,48 @@ describe('firing', () => {
   })
 
   it('refuses to fire while the cooldown is up', () => {
-    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0.1, thrusting: false } }), press({ fire: true }), DT)
+    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0.1, thrusting: false, field: 'off' } }), press({ fire: true }), DT)
     expect(w.bullets).toHaveLength(0)
   })
 
   it('culls bullets when their ttl runs out', () => {
     const w = step(makeWorld({ bullets: [{ pos: { x: 10, y: 10 }, vel: { x: 0, y: 0 }, ttl: 0.005 }] }), NONE, DT)
     expect(w.bullets).toHaveLength(0)
+  })
+})
+
+describe('polarity field', () => {
+  const mote = (x: number, vx: number) => ({ pos: { x, y: 300 }, vel: { x: vx, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [] })
+
+  it('attract pulls a nearby mote toward the ship', () => {
+    const w = step(makeWorld({ asteroids: [mote(500, 0)] }), press({ attract: true }), DT)
+    expect(w.asteroids[0].vel.x).toBeLessThan(0) // ship is at x=400, mote at x=500 → pulled left
+    expect(w.asteroids[0].pos.x).toBeLessThan(500)
+  })
+
+  it('repel pushes a nearby mote away from the ship', () => {
+    const w = step(makeWorld({ asteroids: [mote(500, 0)] }), press({ repel: true }), DT)
+    expect(w.asteroids[0].vel.x).toBeGreaterThan(0)
+    expect(w.asteroids[0].pos.x).toBeGreaterThan(500)
+  })
+
+  it('leaves motes beyond the field range untouched', () => {
+    const w = step(makeWorld({ asteroids: [mote(700, 0)] }), press({ attract: true }), DT) // dist 300 > range
+    expect(w.asteroids[0].vel.x).toBe(0)
+    expect(w.asteroids[0].vel.y).toBe(0)
+  })
+
+  it('clamps mote speed so the field cannot fling them away', () => {
+    const w = step(makeWorld({ asteroids: [mote(500, 9999)] }), NONE, DT)
+    expect(Math.hypot(w.asteroids[0].vel.x, w.asteroids[0].vel.y)).toBeCloseTo(360, 1)
+  })
+
+  it('vortex (both held) swirls a mote tangentially instead of cancelling out', () => {
+    // Mote sits due-right of the ship: a purely radial field (attract/repel) leaves
+    // vel.y at 0; the vortex's tangential component makes it non-zero.
+    const w = step(makeWorld({ asteroids: [mote(500, 0)] }), press({ attract: true, repel: true }), DT)
+    expect(w.asteroids[0].vel.y).not.toBe(0)
+    expect(w.asteroids[0].vel.y).toBeLessThan(0)
   })
 })
 

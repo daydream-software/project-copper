@@ -4,12 +4,15 @@ Guidance for working in this repo. Keep it short — details live in `docs/`.
 
 ## What this is
 
-**Project Copper** — a tiny **vector arena** (Asteroids-lineage): a triangle ship in
-a wrapping field of drifting polygons that **split** when shot. **Purely geometric**:
-everything is stroked vector paths drawn in code — **no image/audio/font assets**. It
-starts as a **sandbox toy** and is meant to **grow over time**. Deliberately simpler
-than our other game attempts; we are **not** carrying over their "programmable brain"
-ADN. See `docs/VISION.md` (north star) and `docs/ROADMAP.md` (build order).
+**Project Copper** — a tiny **polarity sandbox**: you're a charged point drifting in a
+wrapping field of motes. No shooting — you **gather** (attract, hold space), **scatter**
+(repel, hold shift), or hold **both** for a **vortex** (tangential swirl). **Purely
+geometric**: everything is stroked vector paths drawn in code — **no image/audio/font
+assets**. Starts as a **sandbox toy**, grows toward a Nova-Drift-flavoured, asset-free
+build-craft depth. The bullet/split mechanic from the earlier slices is **dormant**
+(code intact in `sim.ts`, just no key bound). Deliberately simpler than our other game
+attempts; we are **not** carrying over their "programmable brain" ADN. See
+`docs/VISION.md` (north star) and `docs/ROADMAP.md` (build order).
 
 ## Stack & commands
 

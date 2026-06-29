@@ -4,7 +4,7 @@
 
 import { makeRng, random, range, type Rng } from './rng'
 import { makeShape, overlap, wrap, type Vec2 } from './geometry'
-import type { Asteroid, Bullet, Input, Ship, World } from './entities'
+import type { Asteroid, Bullet, FieldMode, Input, Ship, World } from './entities'
 
 // --- Ship ---
 const TURN_RATE = 3.2 // rad/s
@@ -29,6 +29,13 @@ const ASTEROID_POINTS_MAX = 12
 const CHILD_SCALE = 0.58 // child radius = parent radius * this
 const TARGET_ASTEROIDS = 6 // field is topped up to this count
 const SAFE_SPAWN_DIST = 140 // keep fresh asteroids off the ship
+const MOTE_MAX_SPEED = 360 // clamp so the field can't fling motes off to infinity
+
+// --- Polarity field (the core verb): pull motes in / push them away ---
+/** Reach of the ship's field, px. Exported so the view can draw the ring. */
+export const FIELD_RANGE = 260
+const FIELD_STRENGTH = 1100 // px/s^2 at the centre, falling linearly to 0 at the edge
+const VORTEX_PULL = 0.4 // vortex inward bias (fraction of the tangential force) so motes orbit instead of flinging off
 
 function driftVel(rng: Rng, maxSpeed: number): Vec2 {
   const a = random(rng) * Math.PI * 2
@@ -83,6 +90,7 @@ export function createWorld(seed: number, width: number, height: number): World 
     angle: 0,
     fireCooldown: 0,
     thrusting: false,
+    field: 'off',
   }
   const asteroids = [...Array(TARGET_ASTEROIDS).keys()].map(() =>
     spawnAsteroid(rng, width, height, ASTEROID_BASE_RADIUS, ship.pos),
@@ -115,6 +123,54 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
     angle,
     fireCooldown: Math.max(0, ship.fireCooldown - dt),
     thrusting: input.thrust,
+    field: fieldMode(input),
+  }
+}
+
+// Which field is active this step. Both held = vortex (the interesting case),
+// not a mutual cancellation.
+function fieldMode(input: Input): FieldMode {
+  if (input.attract && input.repel) return 'vortex'
+  if (input.attract) return 'attract'
+  if (input.repel) return 'repel'
+  return 'off'
+}
+
+// Field acceleration on a mote, given the unit vector (ux, uy) pointing FROM the mote
+// TOWARD the ship and a magnitude `mag`. attract = inward, repel = outward,
+// vortex = tangential (perpendicular) swirl plus a gentle inward bias so motes orbit.
+function fieldAccel(mode: FieldMode, ux: number, uy: number, mag: number): Vec2 {
+  if (mode === 'attract') return { x: ux * mag, y: uy * mag }
+  if (mode === 'repel') return { x: -ux * mag, y: -uy * mag }
+  return { x: -uy * mag + ux * mag * VORTEX_PULL, y: ux * mag + uy * mag * VORTEX_PULL }
+}
+
+// Drift a mote, apply the ship's polarity field (linear falloff over FIELD_RANGE),
+// clamp its speed, then move + spin it (wrapping).
+function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number): Asteroid {
+  let vx = a.vel.x
+  let vy = a.vel.y
+  if (ship.field !== 'off') {
+    const dx = ship.pos.x - a.pos.x
+    const dy = ship.pos.y - a.pos.y
+    const dist = Math.hypot(dx, dy)
+    if (dist > 0 && dist < FIELD_RANGE) {
+      const mag = FIELD_STRENGTH * (1 - dist / FIELD_RANGE) * dt
+      const acc = fieldAccel(ship.field, dx / dist, dy / dist, mag)
+      vx += acc.x
+      vy += acc.y
+    }
+  }
+  const speed = Math.hypot(vx, vy)
+  if (speed > MOTE_MAX_SPEED) {
+    vx = (vx / speed) * MOTE_MAX_SPEED
+    vy = (vy / speed) * MOTE_MAX_SPEED
+  }
+  return {
+    ...a,
+    vel: { x: vx, y: vy },
+    pos: { x: wrap(a.pos.x + vx * dt, width), y: wrap(a.pos.y + vy * dt, height) },
+    angle: a.angle + a.spin * dt,
   }
 }
 
@@ -183,12 +239,8 @@ export function step(world: World, input: Input, dt: number): World {
   const bullets = firing ? [...flying, makeBullet(ship, world.width, world.height)] : flying
   const armed: Ship = firing ? { ...ship, fireCooldown: FIRE_COOLDOWN } : ship
 
-  // Drift + spin + wrap the asteroids, then resolve hits.
-  const moved: Asteroid[] = world.asteroids.map((a) => ({
-    ...a,
-    pos: { x: wrap(a.pos.x + a.vel.x * dt, world.width), y: wrap(a.pos.y + a.vel.y * dt, world.height) },
-    angle: a.angle + a.spin * dt,
-  }))
+  // Drift + field + spin + wrap the motes, then resolve any (dormant) hits.
+  const moved: Asteroid[] = world.asteroids.map((a) => stepMote(a, ship, world.width, world.height, dt))
   const hit = resolveCollisions(rng, bullets, moved)
 
   // Keep the field populated (no game-over yet: it's a sandbox).
