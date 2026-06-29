@@ -29,16 +29,18 @@ const ASTEROID_POINTS_MAX = 12
 const CHILD_SCALE = 0.58 // child radius = parent radius * this
 const TARGET_ASTEROIDS = 6 // field is topped up to this count
 const SAFE_SPAWN_DIST = 140 // keep fresh asteroids off the ship
-const MOTE_MAX_SPEED = 360 // clamp so the field can't fling motes off to infinity
+const MOTE_MAX_SPEED = 720 // clamp so the field can't fling motes off to infinity (high enough for a charged fling)
 
 // --- Polarity field (the core verb): pull motes in / push them away ---
 /** Reach of the ship's field, px. Exported so the view can draw the ring. */
 export const FIELD_RANGE = 260
 const FIELD_STRENGTH = 1100 // px/s^2 at the centre, falling linearly to 0 at the edge
 const VORTEX_RADIUS = FIELD_RANGE * 0.5 // motes settle onto this orbit shell in vortex mode
-const VORTEX_SWIRL = 240 // tangential orbit speed, px/s
+const VORTEX_SWIRL_MIN = 170 // tangential orbit speed at zero charge, px/s
+const VORTEX_SWIRL_MAX = 640 // tangential orbit speed at full charge, px/s — the wound-up fling speed
 const VORTEX_SPRING = 3.5 // pull toward the shell radius, 1/s
 const VORTEX_RESPONSE = 6 // how fast a mote's velocity tracks the vortex target, 1/s
+const CHARGE_TIME = 1.4 // seconds of held vortex to reach full charge
 
 function driftVel(rng: Rng, maxSpeed: number): Vec2 {
   const a = random(rng) * Math.PI * 2
@@ -94,6 +96,7 @@ export function createWorld(seed: number, width: number, height: number): World 
     fireCooldown: 0,
     thrusting: false,
     field: 'off',
+    charge: 0,
   }
   const asteroids = [...Array(TARGET_ASTEROIDS).keys()].map(() =>
     spawnAsteroid(rng, width, height, ASTEROID_BASE_RADIUS, ship.pos),
@@ -120,13 +123,18 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
     vx = (vx / speed) * MAX_SPEED
     vy = (vy / speed) * MAX_SPEED
   }
+  // Charge builds while the vortex is held, and resets the moment it's released —
+  // releasing/scattering then flings the motes at whatever orbit speed was wound up.
+  const field = fieldMode(input)
+  const charge = field === 'vortex' ? Math.min(1, ship.charge + dt / CHARGE_TIME) : 0
   return {
     pos: { x: wrap(ship.pos.x + vx * dt, width), y: wrap(ship.pos.y + vy * dt, height) },
     vel: { x: vx, y: vy },
     angle,
     fireCooldown: Math.max(0, ship.fireCooldown - dt),
     thrusting: input.thrust,
-    field: fieldMode(input),
+    field,
+    charge,
   }
 }
 
@@ -149,11 +157,12 @@ function fieldAccel(mode: FieldMode, ux: number, uy: number, mag: number): Vec2 
 // Vortex steers a mote's velocity toward a rotating shell — a spring toward
 // VORTEX_RADIUS plus a tangential orbit speed — so motes circle the ship and stay
 // captured, instead of a constant tangential force spiralling them out of range.
-// (ux, uy) points from the mote toward the ship.
-function vortexVel(ux: number, uy: number, dist: number, vx: number, vy: number, dt: number): Vec2 {
+// (ux, uy) points from the mote toward the ship; `swirl` is the (charge-scaled)
+// tangential orbit speed.
+function vortexVel(ux: number, uy: number, dist: number, swirl: number, vx: number, vy: number, dt: number): Vec2 {
   const radialOut = VORTEX_SPRING * (VORTEX_RADIUS - dist) // +outward inside the shell, -inward outside
-  const targetX = -ux * radialOut + -uy * VORTEX_SWIRL // outward (-ux,-uy) + tangent (-uy, ux)
-  const targetY = -uy * radialOut + ux * VORTEX_SWIRL
+  const targetX = -ux * radialOut + -uy * swirl // outward (-ux,-uy) + tangent (-uy, ux)
+  const targetY = -uy * radialOut + ux * swirl
   const k = Math.min(1, VORTEX_RESPONSE * dt)
   return { x: vx + (targetX - vx) * k, y: vy + (targetY - vy) * k }
 }
@@ -171,7 +180,8 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
       const ux = dx / dist
       const uy = dy / dist
       if (ship.field === 'vortex') {
-        const v = vortexVel(ux, uy, dist, vx, vy, dt)
+        const swirl = VORTEX_SWIRL_MIN + (VORTEX_SWIRL_MAX - VORTEX_SWIRL_MIN) * ship.charge
+        const v = vortexVel(ux, uy, dist, swirl, vx, vy, dt)
         vx = v.x
         vy = v.y
       } else {

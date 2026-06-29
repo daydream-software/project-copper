@@ -22,6 +22,9 @@ export interface Ship {
   thrusting: boolean
   /** Polarity field this step (drives both the sim force and the view). */
   field: FieldMode
+  /** Vortex charge in [0, 1]: builds while vortex is held, spins motes up faster;
+   * resets when released. Releasing/scattering then flings them at the built speed. */
+  charge: number
 }
 
 export interface Bullet {

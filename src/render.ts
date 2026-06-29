@@ -49,12 +49,22 @@ function drawField(ctx: CanvasRenderingContext2D, world: World): void {
   }
   ctx.globalAlpha = 1
 
-  ctx.lineWidth = 1.5
+  // Reach ring — for the vortex it thickens as charge winds up.
+  ctx.lineWidth = ship.field === 'vortex' ? 1.5 + ship.charge * 3 : 1.5
   ctx.setLineDash(ringDash(ship.field))
   ctx.beginPath()
   ctx.arc(ship.pos.x, ship.pos.y, FIELD_RANGE, 0, Math.PI * 2)
   ctx.stroke()
   ctx.setLineDash([])
+
+  // Charge gauge: a copper arc around the ship that fills as the vortex winds up.
+  if (ship.field === 'vortex') {
+    ctx.lineWidth = 3
+    ctx.strokeStyle = COPPER
+    ctx.beginPath()
+    ctx.arc(ship.pos.x, ship.pos.y, 30, -Math.PI / 2, -Math.PI / 2 + ship.charge * Math.PI * 2)
+    ctx.stroke()
+  }
 }
 
 function drawAsteroids(ctx: CanvasRenderingContext2D, world: World): void {

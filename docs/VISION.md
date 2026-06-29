@@ -42,11 +42,14 @@ three modes, on a linear falloff over its reach:
 
 - **Gather** (attract, hold space) — pull motes inward.
 - **Scatter** (repel, hold shift) — push them outward.
-- **Vortex** (hold both) — a tangential swirl with a gentle inward bias: motes orbit
-  you instead of the two radial forces simply cancelling.
+- **Vortex** (hold both) — motes orbit you on a shell, and the longer you hold the
+  more the orbit **winds up** (a charge gauge fills, the ring thickens). **Release or
+  scatter to fling** the wound-up motes outward. So the three verbs chain into a
+  polarity-native throw — **gather → charge → fling** — no bullets.
 
 The view reads at a glance: a reach ring (solid = gather, dashed = scatter, dotted =
-vortex) and faint tethers to whatever's in range.
+vortex), a charge gauge that fills around the ship, and faint tethers to what's in
+range.
 
 > The earlier slices' **bullet/split** mechanic is **dormant** — the code is intact,
 > just unbound. Nova Drift keeps shooting *alongside* its physics, so we may bring it
@@ -56,8 +59,9 @@ vortex) and faint tethers to whatever's in range.
 
 The growth path leans into the Nova-Drift-flavoured depth, asset-free:
 
-- **Field / charge mods** — reach, strength, alternating polarity, motes that chain or
-  bind, a vortex that flings on release… a build tree of field behaviours.
+- **Field / charge mods** — reach, strength, faster wind-up, a charge that overflows
+  into a burst, alternating polarity, motes that chain or bind… a build tree of field
+  behaviours.
 - **Make it a game** — ship × mote collision, lives, score, runs (roguelite shape).
 - **Juice & variety** — line-debris, mote types, hazards, waves, palette themes.
 - **Audio** — much later, via the workspace `suno-songs/` folder.

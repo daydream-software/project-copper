@@ -10,11 +10,23 @@ function press(over: Partial<Input>): Input {
   return { ...NONE, ...over }
 }
 
+// A mote (drifting polygon) for field tests; shape is irrelevant to the sim.
+const mote = (x: number, vx: number) => ({ pos: { x, y: 300 }, vel: { x: vx, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [] })
+
+// Run the sim n fixed steps under a held input.
+function stepN(w: World, input: Input, n: number): World {
+  let world = w
+  for (let i = 0; i < n; i += 1) {
+    world = step(world, input, DT)
+  }
+  return world
+}
+
 function makeWorld(over: Partial<World> = {}): World {
   return {
     width: 800,
     height: 600,
-    ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' },
+    ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off', charge: 0 },
     bullets: [],
     asteroids: [],
     rngState: 12345,
@@ -67,7 +79,7 @@ describe('ship', () => {
   })
 
   it('drag bleeds velocity when coasting', () => {
-    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 100, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' } }), NONE, DT)
+    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 100, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off', charge: 0 } }), NONE, DT)
     expect(w.ship.vel.x).toBeGreaterThan(0)
     expect(w.ship.vel.x).toBeLessThan(100)
   })
@@ -83,7 +95,7 @@ describe('firing', () => {
   })
 
   it('refuses to fire while the cooldown is up', () => {
-    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0.1, thrusting: false, field: 'off' } }), press({ fire: true }), DT)
+    const w = step(makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0.1, thrusting: false, field: 'off', charge: 0 } }), press({ fire: true }), DT)
     expect(w.bullets).toHaveLength(0)
   })
 
@@ -94,8 +106,6 @@ describe('firing', () => {
 })
 
 describe('polarity field', () => {
-  const mote = (x: number, vx: number) => ({ pos: { x, y: 300 }, vel: { x: vx, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [] })
-
   it('attract pulls a nearby mote toward the ship', () => {
     const w = step(makeWorld({ asteroids: [mote(500, 0)] }), press({ attract: true }), DT)
     expect(w.asteroids[0].vel.x).toBeLessThan(0) // ship is at x=400, mote at x=500 → pulled left
@@ -114,9 +124,9 @@ describe('polarity field', () => {
     expect(w.asteroids[0].vel.y).toBe(0)
   })
 
-  it('clamps mote speed so the field cannot fling them away', () => {
+  it('clamps mote speed so the field cannot fling them off to infinity', () => {
     const w = step(makeWorld({ asteroids: [mote(500, 9999)] }), NONE, DT)
-    expect(Math.hypot(w.asteroids[0].vel.x, w.asteroids[0].vel.y)).toBeCloseTo(360, 1)
+    expect(Math.hypot(w.asteroids[0].vel.x, w.asteroids[0].vel.y)).toBeCloseTo(720, 1)
   })
 
   it('vortex (both held) swirls a mote tangentially instead of cancelling out', () => {
@@ -125,6 +135,30 @@ describe('polarity field', () => {
     const w = step(makeWorld({ asteroids: [mote(500, 0)] }), press({ attract: true, repel: true }), DT)
     expect(w.asteroids[0].vel.y).not.toBe(0)
     expect(w.asteroids[0].vel.y).toBeLessThan(0)
+  })
+})
+
+describe('vortex charge', () => {
+  const both = press({ attract: true, repel: true })
+
+  it('builds while the vortex is held and caps at 1', () => {
+    const once = step(makeWorld(), both, DT)
+    expect(once.ship.charge).toBeGreaterThan(0)
+    expect(once.ship.charge).toBeLessThan(1)
+    expect(stepN(makeWorld(), both, 300).ship.charge).toBe(1)
+  })
+
+  it('resets the moment the vortex is released', () => {
+    const charged = makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off', charge: 0.5 } })
+    expect(step(charged, NONE, DT).ship.charge).toBe(0)
+  })
+
+  it('a longer-held vortex winds motes up to a higher orbit speed', () => {
+    const brief = stepN(makeWorld({ asteroids: [mote(500, 0)] }), both, 5)
+    const wound = stepN(makeWorld({ asteroids: [mote(500, 0)] }), both, 200)
+    const sBrief = Math.hypot(brief.asteroids[0].vel.x, brief.asteroids[0].vel.y)
+    const sWound = Math.hypot(wound.asteroids[0].vel.x, wound.asteroids[0].vel.y)
+    expect(sWound).toBeGreaterThan(sBrief)
   })
 })
 

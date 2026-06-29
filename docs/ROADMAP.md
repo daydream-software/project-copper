@@ -23,9 +23,11 @@
 
 You're a charged point; you **bend the field** instead of shooting. Three modes with
 linear falloff: **gather** (attract), **scatter** (repel), **vortex** (both held —
-tangential swirl + gentle inward bias, so it's interesting, not a cancellation).
-View: reach ring (solid / dashed / dotted) + tethers. (`sim.ts` `stepMote` /
-`fieldMode` / `fieldAccel`, `render.ts` `drawField`, `input.ts`.)
+motes orbit a shell). The vortex **charges** the longer it's held (orbit winds up,
+gauge fills); **release or scatter flings** the wound-up motes outward — a
+polarity-native **gather → charge → fling** throw, no bullets. View: reach ring
+(solid / dashed / dotted, thickening with charge), a charge gauge, and tethers.
+(`sim.ts` `stepMote` / `fieldMode` / `vortexVel`, `render.ts` `drawField`, `input.ts`.)
 
 ## Next — the open ladder (not built yet)
 
