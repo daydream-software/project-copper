@@ -52,12 +52,13 @@ held field (dashed = scatter, dotted = vortex, thickening with charge), a charge
 around the ship, and faint tethers to what's in range.
 
 **Charged motes & splitting.** Any field interaction (pulse, scatter, vortex) leaves a
-mote **charged** for a few seconds — it glows brighter and thicker. A charged mote
-**splits** an uncharged one it touches into two smaller fragments (down to a minimum,
-where it's destroyed), discharging itself in the process. So the throw has teeth: fling
-your charged motes into the fresh field and they shatter it. (This is the old
-bullet-hit split, now driven by polarity instead of bullets — the dormant gun isn't
-needed.) It closes the loop: **gather → charge → fling → shatter.**
+mote **charged** for a few seconds — it glows brighter and thicker. When a charged mote
+touches an uncharged one, **both shatter** into two smaller fragments (down to a
+minimum, where they're destroyed). So the throw has teeth: fling your charged motes into
+the fresh field and they break apart on impact, taking their target with them. (This is
+the old bullet-hit split, now driven by polarity instead of bullets — the dormant gun
+isn't needed.) It closes the loop: **gather → charge → fling → shatter.** (A sandbox
+**piercing** option makes the charger survive and plow through instead.)
 
 > The earlier slices' **bullet/split** mechanic is **dormant** — the code is intact,
 > just unbound. Nova Drift keeps shooting *alongside* its physics, so we may bring it

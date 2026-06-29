@@ -184,9 +184,9 @@ describe('charged-mote collisions', () => {
     expect(w.asteroids[0].charge).toBeGreaterThan(0)
   })
 
-  it('a charged mote splits an uncharged one on contact', () => {
+  it('a charged hit shatters both motes (the charger splits too)', () => {
     const w = step(makeWorld({ rngState: 99, asteroids: [moteAt(300, 300, 48, 2), moteAt(300, 300, 48, 0)] }), NONE, DT)
-    expect(w.asteroids.filter((a) => a.radius < 40).length).toBeGreaterThanOrEqual(2) // two children of the split
+    expect(w.asteroids.filter((a) => a.radius < 40).length).toBeGreaterThanOrEqual(4) // two children from each mote
   })
 
   it('two charged motes do not split each other', () => {

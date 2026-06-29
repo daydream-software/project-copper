@@ -42,9 +42,11 @@ A floating panel (`index.html` / `style.css`, wired in `main.ts`) toggles mechan
 live via a `Config` (`config.ts`) passed to `step(world, input, dt, config)` —
 `DEFAULT_CONFIG` is the shipped behaviour so the default arg keeps existing callers
 unchanged. Toggles: gather **pulse vs continuous attract**, **scatter**, **vortex**,
-the **gun** (press F — the dormant bullets, re-enabled), **charged-mote split**,
-**piercing** (chargers keep their charge), **chain reaction** (fragments born charged,
-bounded by `MAX_MOTES`), plus **reseed**. Every toggle has a discriminating unit test.
+the **gun** (press F — the dormant bullets, re-enabled), **charged-mote split** (a
+charged hit shatters both motes), **piercing** (the charger survives & plows through
+instead of shattering), **chain reaction** (fragments born charged, bounded by
+`MAX_MOTES`), plus **reseed**. The on-screen hint tracks the config. Every toggle has a
+discriminating unit test.
 
 ## Next — the open ladder (not built yet)
 

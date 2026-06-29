@@ -14,7 +14,7 @@ export interface Config {
   gun: boolean
   /** Charged motes split uncharged ones on contact. */
   chargedSplit: boolean
-  /** A charged mote keeps its charge after a hit (pierces) instead of discharging. */
+  /** A charged mote survives a hit (keeps its charge, pierces) instead of shattering. */
   piercing: boolean
   /** Split fragments are born charged, so a hit can cascade. */
   chainReaction: boolean

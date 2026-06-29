@@ -44,10 +44,22 @@ function readPanel(): Config {
   }
 }
 
+// Keep the on-screen hint in sync with the active config.
+function updateHint(): void {
+  const parts = ['↑ thrust', '← → turn', config.gather === 'attract' ? 'hold space = attract' : 'tap space = gather pulse']
+  if (config.scatter) parts.push('shift = scatter')
+  if (config.vortex) parts.push('space + shift = vortex (charge, release to fling)')
+  if (config.gun) parts.push('F = fire')
+  const hint = document.querySelector('#hint')
+  if (hint !== null) hint.textContent = parts.join(' · ')
+}
+updateHint()
+
 const panel = document.querySelector<HTMLElement>('#panel')
 if (panel !== null) {
   panel.addEventListener('change', (e) => {
     config = readPanel()
+    updateHint()
     // Blur the control so the next space/shift goes to the game, not the checkbox.
     if (e.target instanceof HTMLElement) e.target.blur()
   })

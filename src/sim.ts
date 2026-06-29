@@ -226,38 +226,39 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
   }
 }
 
-// A charged mote splits an uncharged one it overlaps (reusing the bullet-hit split),
-// and discharges itself in the process. Charged↔charged and uncharged↔uncharged do
-// nothing. Returns the indices to split and the chargers to discharge.
-function findMoteSplits(motes: Asteroid[]): { split: Set<number>, discharge: Set<number> } {
-  const split = new Set<number>()
-  const discharge = new Set<number>()
+// A charged mote that overlaps an uncharged one triggers the bullet-style split.
+// Charged↔charged and uncharged↔uncharged do nothing. Returns the uncharged motes hit
+// (`targets`) and the charged motes that hit something (`chargers`).
+function findMoteSplits(motes: Asteroid[]): { targets: Set<number>, chargers: Set<number> } {
+  const targets = new Set<number>()
+  const chargers = new Set<number>()
   for (const [i, mi] of motes.entries()) {
     if (mi.charge <= 0) continue
     for (const [j, mj] of motes.entries()) {
       if (i === j) continue
       if (mj.charge > 0) continue
       if (!overlap(mi.pos, mi.radius, mj.pos, mj.radius)) continue
-      split.add(j)
-      discharge.add(i)
+      targets.add(j)
+      chargers.add(i)
     }
   }
-  return { split, discharge }
+  return { targets, chargers }
 }
 
 function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Asteroid[] {
   if (motes.length >= MAX_MOTES) return motes // safety valve: stop splitting (chain guard)
-  const { split, discharge } = findMoteSplits(motes)
+  const { targets, chargers } = findMoteSplits(motes)
   const childCharge = config.chainReaction ? MOTE_CHARGE_TIME : 0 // fragments born charged → cascade
   const out: Asteroid[] = []
   for (const [idx, m] of motes.entries()) {
-    if (split.has(idx)) {
+    // Both motes shatter on a charged hit — including the charger itself, unless
+    // piercing, where it survives whole (keeping its charge) and plows through.
+    const shatters = targets.has(idx) || (chargers.has(idx) && !config.piercing)
+    if (shatters) {
       if (m.radius > ASTEROID_MIN_RADIUS) out.push(spawnChild(rng, m, childCharge), spawnChild(rng, m, childCharge))
       // else: destroyed at min size (same as a bullet hit)
     } else {
-      // piercing: a charger keeps its charge instead of discharging.
-      const keep = !discharge.has(idx) || config.piercing
-      out.push(keep ? m : { ...m, charge: 0 })
+      out.push(m)
     }
   }
   return out
