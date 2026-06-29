@@ -1,7 +1,7 @@
 # Project Copper
 
 A tiny **polarity sandbox**: you're a charged point drifting through a wrapping field
-of motes. You don't shoot — you **gather** them (attract), **scatter** them (repel),
+of motes. You don't shoot — you **gather** them (a pulse), **scatter** them (repel),
 or hold both to spin them into a **vortex**. Everything is **stroked vector geometry
 drawn in code**: no images, no audio, no fonts. It starts as a sandbox toy and grows
 toward a Nova-Drift-flavoured, asset-free build-craft depth.
@@ -24,9 +24,9 @@ npm run build    # typecheck (tsc) + lint + production build into dist/
 npm run preview  # serve the production build locally
 ```
 
-Controls: **↑ / W** thrust · **← →** turn · **space** gather (attract) · **shift**
-scatter (repel) · **both held** = vortex. Add `?seed=<n>` to the URL for a specific
-arena.
+Controls: **↑ / W** thrust · **← →** turn · **tap space** = gather pulse · **shift** =
+scatter · **hold space + shift** = vortex (charge, then release to fling). Add
+`?seed=<n>` to the URL for a specific arena.
 
 ## How it works
 

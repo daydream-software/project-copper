@@ -2,12 +2,13 @@
 // game logic, no allocation of game state — it only reads the world and writes the
 // canvas. Everything is geometry; there are no image assets.
 
-import { FIELD_RANGE } from './sim'
+import { FIELD_RANGE, PULSE_RANGE } from './sim'
 import type { FieldMode, World } from './entities'
 
 const BG = '#0a0a0a'
 const COPPER = '#d98a44'
 const COPPER_DIM = '#b87333'
+const PULSE_FLASH = 0.35 // seconds the gather-pulse ripple stays visible
 
 export function draw(ctx: CanvasRenderingContext2D, world: World): void {
   ctx.fillStyle = BG
@@ -19,6 +20,22 @@ export function draw(ctx: CanvasRenderingContext2D, world: World): void {
   drawAsteroids(ctx, world)
   drawBullets(ctx, world)
   drawShip(ctx, world)
+  drawPulse(ctx, world)
+}
+
+// A gather pulse: a copper ring that collapses inward from PULSE_RANGE and fades —
+// reads as a sharp inward tug.
+function drawPulse(ctx: CanvasRenderingContext2D, world: World): void {
+  const { ship } = world
+  if (ship.pulseT >= PULSE_FLASH) return
+  const k = ship.pulseT / PULSE_FLASH // 0 -> 1 across the flash
+  ctx.strokeStyle = COPPER
+  ctx.lineWidth = 2
+  ctx.globalAlpha = 0.85 * (1 - k)
+  ctx.beginPath()
+  ctx.arc(ship.pos.x, ship.pos.y, (1 - k) * PULSE_RANGE, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.globalAlpha = 1
 }
 
 // Reach-ring dash pattern per mode: attract solid, repel dashed, vortex dotted.

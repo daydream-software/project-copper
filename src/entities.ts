@@ -4,12 +4,11 @@
 import type { Vec2 } from './geometry'
 
 /**
- * The polarity field's mode this step:
- * - `attract` (gather, radial in) · `repel` (scatter, radial out)
- * - `vortex` (both held: tangential swirl + a gentle inward bias — motes orbit)
- * - `off`
+ * The polarity field's continuous mode this step:
+ * - `repel` (scatter, radial out) · `vortex` (both held: motes orbit a shell) · `off`
+ * (Gathering is now a discrete `pulse`, not a continuous mode — see Input.)
  */
-export type FieldMode = 'attract' | 'off' | 'repel' | 'vortex'
+export type FieldMode = 'off' | 'repel' | 'vortex'
 
 export interface Ship {
   pos: Vec2
@@ -25,6 +24,9 @@ export interface Ship {
   /** Vortex charge in [0, 1]: builds while vortex is held, spins motes up faster;
    * resets when released. Releasing/scattering then flings them at the built speed. */
   charge: number
+  /** Seconds since the last gather pulse fired (drives the expanding ripple in the
+   * view); large when no recent pulse. 0 exactly on the step a pulse fires. */
+  pulseT: number
 }
 
 export interface Bullet {
@@ -51,10 +53,12 @@ export interface Input {
   thrust: boolean
   turnLeft: boolean
   turnRight: boolean
-  /** Pull nearby motes toward the ship. */
+  /** Whether the gather key is held — only meaningful with `repel` (together = vortex). */
   attract: boolean
   /** Push nearby motes away from the ship. */
   repel: boolean
+  /** A one-shot gather pulse this step: an impulse that yanks nearby motes inward. */
+  pulse: boolean
   /** Dormant for now (no key bound): the bullet/split mechanic from slices 2–4. */
   fire: boolean
 }

@@ -42,6 +42,11 @@ const VORTEX_SPRING = 3.5 // pull toward the shell radius, 1/s
 const VORTEX_RESPONSE = 6 // how fast a mote's velocity tracks the vortex target, 1/s
 const CHARGE_TIME = 1.4 // seconds of held vortex to reach full charge
 
+// --- Gather pulse (replaces a continuous attract): a discrete inward impulse ---
+/** Reach of a gather pulse, px. Exported so the view can size the ripple. */
+export const PULSE_RANGE = 300
+const PULSE_STRENGTH = 380 // inward velocity kick at the centre, px/s (linear falloff to 0 at the edge)
+
 function driftVel(rng: Rng, maxSpeed: number): Vec2 {
   const a = random(rng) * Math.PI * 2
   const s = random(rng) * maxSpeed
@@ -97,6 +102,7 @@ export function createWorld(seed: number, width: number, height: number): World 
     thrusting: false,
     field: 'off',
     charge: 0,
+    pulseT: 99,
   }
   const asteroids = [...Array(TARGET_ASTEROIDS).keys()].map(() =>
     spawnAsteroid(rng, width, height, ASTEROID_BASE_RADIUS, ship.pos),
@@ -135,23 +141,27 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
     thrusting: input.thrust,
     field,
     charge,
+    pulseT: input.pulse ? 0 : ship.pulseT + dt,
   }
 }
 
-// Which field is active this step. Both held = vortex (the interesting case),
-// not a mutual cancellation.
+// Which continuous field is active this step. Both gather+scatter held = vortex;
+// scatter alone = repel; otherwise off. (Gather alone is a discrete pulse, not here.)
 function fieldMode(input: Input): FieldMode {
   if (input.attract && input.repel) return 'vortex'
-  if (input.attract) return 'attract'
   if (input.repel) return 'repel'
   return 'off'
 }
 
-// Radial field acceleration for the two simple modes: attract = inward, repel = out.
-// (ux, uy) points from the mote toward the ship; `mag` already folds in the falloff.
-function fieldAccel(mode: FieldMode, ux: number, uy: number, mag: number): Vec2 {
-  if (mode === 'repel') return { x: -ux * mag, y: -uy * mag }
-  return { x: ux * mag, y: uy * mag }
+// A gather pulse: a one-shot inward velocity kick (linear falloff over PULSE_RANGE)
+// on every mote in reach. Replaces the old continuous attract — a sharp tug, not a hold.
+function pulseKick(a: Asteroid, shipPos: Vec2): Asteroid {
+  const dx = shipPos.x - a.pos.x
+  const dy = shipPos.y - a.pos.y
+  const dist = Math.hypot(dx, dy)
+  if (dist === 0 || dist >= PULSE_RANGE) return a
+  const kick = PULSE_STRENGTH * (1 - dist / PULSE_RANGE)
+  return { ...a, vel: { x: a.vel.x + (dx / dist) * kick, y: a.vel.y + (dy / dist) * kick } }
 }
 
 // Vortex steers a mote's velocity toward a rotating shell — a spring toward
@@ -185,10 +195,10 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
         vx = v.x
         vy = v.y
       } else {
+        // 'repel' (scatter): radial outward.
         const mag = FIELD_STRENGTH * (1 - dist / FIELD_RANGE) * dt
-        const acc = fieldAccel(ship.field, ux, uy, mag)
-        vx += acc.x
-        vy += acc.y
+        vx -= ux * mag
+        vy -= uy * mag
       }
     }
   }
@@ -270,8 +280,10 @@ export function step(world: World, input: Input, dt: number): World {
   const bullets = firing ? [...flying, makeBullet(ship, world.width, world.height)] : flying
   const armed: Ship = firing ? { ...ship, fireCooldown: FIRE_COOLDOWN } : ship
 
-  // Drift + field + spin + wrap the motes, then resolve any (dormant) hits.
-  const moved: Asteroid[] = world.asteroids.map((a) => stepMote(a, ship, world.width, world.height, dt))
+  // A gather pulse yanks motes inward first (a one-shot velocity kick), then the
+  // continuous field + drift + spin + wrap; finally resolve any (dormant) hits.
+  const kicked = input.pulse ? world.asteroids.map((a) => pulseKick(a, ship.pos)) : world.asteroids
+  const moved: Asteroid[] = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt))
   const hit = resolveCollisions(rng, bullets, moved)
 
   // Keep the field populated (no game-over yet: it's a sandbox).

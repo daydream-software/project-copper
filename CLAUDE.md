@@ -5,8 +5,9 @@ Guidance for working in this repo. Keep it short — details live in `docs/`.
 ## What this is
 
 **Project Copper** — a tiny **polarity sandbox**: you're a charged point drifting in a
-wrapping field of motes. No shooting — you **gather** (attract, hold space), **scatter**
-(repel, hold shift), or hold **both** for a **vortex** (tangential swirl). **Purely
+wrapping field of motes. No shooting — you **gather** (a one-shot **pulse**, tap space),
+**scatter** (repel, hold shift), or hold **space + shift** for a **vortex** that winds up
+a **charge** and **flings** the motes on release. **Purely
 geometric**: everything is stroked vector paths drawn in code — **no image/audio/font
 assets**. Starts as a **sandbox toy**, grows toward a Nova-Drift-flavoured, asset-free
 build-craft depth. The bullet/split mechanic from the earlier slices is **dormant**

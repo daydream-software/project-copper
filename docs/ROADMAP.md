@@ -21,13 +21,14 @@
 
 ### Slice P — the polarity pivot (the game's verb)
 
-You're a charged point; you **bend the field** instead of shooting. Three modes with
-linear falloff: **gather** (attract), **scatter** (repel), **vortex** (both held —
-motes orbit a shell). The vortex **charges** the longer it's held (orbit winds up,
+You're a charged point; you **bend the field** instead of shooting. **Gather** is a
+discrete **pulse** (tap — a one-shot inward impulse); **scatter** (repel) and **vortex**
+(both held) are continuous. The vortex **charges** the longer it's held (orbit winds up,
 gauge fills); **release or scatter flings** the wound-up motes outward — a
-polarity-native **gather → charge → fling** throw, no bullets. View: reach ring
-(solid / dashed / dotted, thickening with charge), a charge gauge, and tethers.
-(`sim.ts` `stepMote` / `fieldMode` / `vortexVel`, `render.ts` `drawField`, `input.ts`.)
+polarity-native **gather → charge → fling** throw, no bullets. View: pulse ripple,
+reach ring (dashed / dotted, thickening with charge), a charge gauge, and tethers.
+(`sim.ts` `pulseKick` / `stepMote` / `fieldMode` / `vortexVel`, `render.ts` `drawField`
+/ `drawPulse`, `input.ts` edge-triggered `consumePulse`.)
 
 ## Next — the open ladder (not built yet)
 

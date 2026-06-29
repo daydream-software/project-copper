@@ -37,19 +37,19 @@ though, is ours — **polarity**, not guns.
 ## The verb: polarity
 
 You are a charged point. You drift (thrust + rotate + a little drag) through a
-wrapping arena of **motes** (the drifting polygons). Your one tool is a **field** with
-three modes, on a linear falloff over its reach:
+wrapping arena of **motes** (the drifting polygons), and you bend the field around you:
 
-- **Gather** (attract, hold space) — pull motes inward.
-- **Scatter** (repel, hold shift) — push them outward.
-- **Vortex** (hold both) — motes orbit you on a shell, and the longer you hold the
-  more the orbit **winds up** (a charge gauge fills, the ring thickens). **Release or
-  scatter to fling** the wound-up motes outward. So the three verbs chain into a
+- **Gather pulse** (tap space) — a one-shot impulse that yanks nearby motes inward;
+  tap to herd them in (a sharp tug, not a continuous hold).
+- **Scatter** (hold shift) — a continuous radial push, motes away.
+- **Vortex** (hold space + shift) — motes orbit you on a shell, and the longer you hold
+  the more the orbit **winds up** (a charge gauge fills, the ring thickens). **Release
+  or scatter to fling** the wound-up motes outward. So the verbs chain into a
   polarity-native throw — **gather → charge → fling** — no bullets.
 
-The view reads at a glance: a reach ring (solid = gather, dashed = scatter, dotted =
-vortex), a charge gauge that fills around the ship, and faint tethers to what's in
-range.
+The view reads at a glance: a pulse ripple that collapses inward, a reach ring for the
+held field (dashed = scatter, dotted = vortex, thickening with charge), a charge gauge
+around the ship, and faint tethers to what's in range.
 
 > The earlier slices' **bullet/split** mechanic is **dormant** — the code is intact,
 > just unbound. Nova Drift keeps shooting *alongside* its physics, so we may bring it

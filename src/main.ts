@@ -24,7 +24,8 @@ let world: World = createWorld(readSeed(), canvas.width, canvas.height)
 
 const loop = createLoop(
   (dt) => {
-    world = step(world, input.state, dt)
+    // Inject the one-shot gather pulse so the impulse lands on a single fixed step.
+    world = step(world, { ...input.state, pulse: input.consumePulse() }, dt)
   },
   () => {
     draw(ctx, world)
