@@ -11,7 +11,10 @@ function press(over: Partial<Input>): Input {
 }
 
 // A mote (drifting polygon) for field tests; shape is irrelevant to the sim.
-const mote = (x: number, vx: number) => ({ pos: { x, y: 300 }, vel: { x: vx, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [] })
+const mote = (x: number, vx: number) => ({ pos: { x, y: 300 }, vel: { x: vx, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 0 })
+
+// A mote at a fixed spot with a given radius and charge, for collision tests.
+const moteAt = (x: number, y: number, radius: number, charge: number) => ({ pos: { x, y }, vel: { x: 0, y: 0 }, radius, angle: 0, spin: 0, shape: [], charge })
 
 // Run the sim n fixed steps under a held input.
 function stepN(w: World, input: Input, n: number): World {
@@ -168,6 +171,28 @@ describe('vortex charge', () => {
   })
 })
 
+describe('charged-mote collisions', () => {
+  it('a field interaction charges a mote', () => {
+    const w = step(makeWorld({ asteroids: [mote(500, 0)] }), press({ pulse: true }), DT)
+    expect(w.asteroids[0].charge).toBeGreaterThan(0)
+  })
+
+  it('a charged mote splits an uncharged one on contact', () => {
+    const w = step(makeWorld({ rngState: 99, asteroids: [moteAt(300, 300, 48, 2), moteAt(300, 300, 48, 0)] }), NONE, DT)
+    expect(w.asteroids.filter((a) => a.radius < 40).length).toBeGreaterThanOrEqual(2) // two children of the split
+  })
+
+  it('two charged motes do not split each other', () => {
+    const w = step(makeWorld({ asteroids: [moteAt(300, 300, 48, 2), moteAt(300, 300, 48, 2)] }), NONE, DT)
+    expect(w.asteroids.filter((a) => a.radius < 40)).toHaveLength(0)
+  })
+
+  it('two uncharged motes do not split each other', () => {
+    const w = step(makeWorld({ asteroids: [moteAt(300, 300, 48, 0), moteAt(300, 300, 48, 0)] }), NONE, DT)
+    expect(w.asteroids.filter((a) => a.radius < 40)).toHaveLength(0)
+  })
+})
+
 describe('asteroid collision', () => {
   const SHAPE = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }]
 
@@ -175,7 +200,7 @@ describe('asteroid collision', () => {
     const w = step(
       makeWorld({
         rngState: 99,
-        asteroids: [{ pos: { x: 200, y: 200 }, vel: { x: 0, y: 0 }, radius: 48, angle: 0, spin: 0, shape: SHAPE }],
+        asteroids: [{ pos: { x: 200, y: 200 }, vel: { x: 0, y: 0 }, radius: 48, angle: 0, spin: 0, shape: SHAPE, charge: 0 }],
         bullets: [{ pos: { x: 200, y: 200 }, vel: { x: 0, y: 0 }, ttl: 1 }],
       }),
       NONE,
@@ -189,7 +214,7 @@ describe('asteroid collision', () => {
     const w = step(
       makeWorld({
         rngState: 99,
-        asteroids: [{ pos: { x: 200, y: 200 }, vel: { x: 0, y: 0 }, radius: 18, angle: 0, spin: 0, shape: SHAPE }],
+        asteroids: [{ pos: { x: 200, y: 200 }, vel: { x: 0, y: 0 }, radius: 18, angle: 0, spin: 0, shape: SHAPE, charge: 0 }],
         bullets: [{ pos: { x: 200, y: 200 }, vel: { x: 0, y: 0 }, ttl: 1 }],
       }),
       NONE,

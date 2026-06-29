@@ -46,6 +46,9 @@ export interface Asteroid {
   spin: number
   /** Unit vertices (scaled by radius when drawn). */
   shape: Vec2[]
+  /** Seconds of charge remaining: a mote is "charged" after the field touches it,
+   * and a charged mote splits an uncharged one on contact. Decays to 0. */
+  charge: number
 }
 
 /** The per-step intent collected from the keyboard. */

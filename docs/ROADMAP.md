@@ -30,6 +30,12 @@ reach ring (dashed / dotted, thickening with charge), a charge gauge, and tether
 (`sim.ts` `pulseKick` / `stepMote` / `fieldMode` / `vortexVel`, `render.ts` `drawField`
 / `drawPulse`, `input.ts` edge-triggered `consumePulse`.)
 
+**Charged motes (the split is back).** Any field interaction charges a mote for a few
+seconds (it glows); a **charged mote splits an uncharged one on contact** into two
+fragments (reusing the bullet-hit split + `spawnChild`), discharging itself. Closes the
+loop **gather → charge → fling → shatter**. (`sim.ts` `findMoteSplits` /
+`resolveMoteCollisions`; mote `charge` in `entities.ts`; brighter render in `drawAsteroids`.)
+
 ## Next — the open ladder (not built yet)
 
 5. **Sandbox knobs.** Live-tune field range / strength / vortex bias / mote count /

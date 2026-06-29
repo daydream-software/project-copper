@@ -46,6 +46,7 @@ const CHARGE_TIME = 1.4 // seconds of held vortex to reach full charge
 /** Reach of a gather pulse, px. Exported so the view can size the ripple. */
 export const PULSE_RANGE = 300
 const PULSE_STRENGTH = 380 // inward velocity kick at the centre, px/s (linear falloff to 0 at the edge)
+const MOTE_CHARGE_TIME = 2.5 // seconds a mote stays "charged" after the field touches it
 
 function driftVel(rng: Rng, maxSpeed: number): Vec2 {
   const a = random(rng) * Math.PI * 2
@@ -75,6 +76,7 @@ function spawnAsteroid(rng: Rng, width: number, height: number, radius: number, 
     angle: random(rng) * Math.PI * 2,
     spin: (random(rng) * 2 - 1) * ASTEROID_MAX_SPIN,
     shape: makeShape(rng, range(rng, ASTEROID_POINTS_MIN, ASTEROID_POINTS_MAX)),
+    charge: 0,
   }
 }
 
@@ -88,6 +90,7 @@ function spawnChild(rng: Rng, parent: Asteroid): Asteroid {
     angle: random(rng) * Math.PI * 2,
     spin: (random(rng) * 2 - 1) * ASTEROID_MAX_SPIN,
     shape: makeShape(rng, range(rng, ASTEROID_POINTS_MIN, ASTEROID_POINTS_MAX)),
+    charge: 0,
   }
 }
 
@@ -161,7 +164,7 @@ function pulseKick(a: Asteroid, shipPos: Vec2): Asteroid {
   const dist = Math.hypot(dx, dy)
   if (dist === 0 || dist >= PULSE_RANGE) return a
   const kick = PULSE_STRENGTH * (1 - dist / PULSE_RANGE)
-  return { ...a, vel: { x: a.vel.x + (dx / dist) * kick, y: a.vel.y + (dy / dist) * kick } }
+  return { ...a, charge: MOTE_CHARGE_TIME, vel: { x: a.vel.x + (dx / dist) * kick, y: a.vel.y + (dy / dist) * kick } }
 }
 
 // Vortex steers a mote's velocity toward a rotating shell — a spring toward
@@ -182,11 +185,13 @@ function vortexVel(ux: number, uy: number, dist: number, swirl: number, vx: numb
 function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number): Asteroid {
   let vx = a.vel.x
   let vy = a.vel.y
+  let touched = false
   if (ship.field !== 'off') {
     const dx = ship.pos.x - a.pos.x
     const dy = ship.pos.y - a.pos.y
     const dist = Math.hypot(dx, dy)
     if (dist > 0 && dist < FIELD_RANGE) {
+      touched = true
       const ux = dx / dist
       const uy = dy / dist
       if (ship.field === 'vortex') {
@@ -212,7 +217,42 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
     vel: { x: vx, y: vy },
     pos: { x: wrap(a.pos.x + vx * dt, width), y: wrap(a.pos.y + vy * dt, height) },
     angle: a.angle + a.spin * dt,
+    // The field touching a mote (re)charges it; otherwise the charge ebbs away.
+    charge: touched ? MOTE_CHARGE_TIME : Math.max(0, a.charge - dt),
   }
+}
+
+// A charged mote splits an uncharged one it overlaps (reusing the bullet-hit split),
+// and discharges itself in the process. Charged↔charged and uncharged↔uncharged do
+// nothing. Returns the indices to split and the chargers to discharge.
+function findMoteSplits(motes: Asteroid[]): { split: Set<number>, discharge: Set<number> } {
+  const split = new Set<number>()
+  const discharge = new Set<number>()
+  for (const [i, mi] of motes.entries()) {
+    if (mi.charge <= 0) continue
+    for (const [j, mj] of motes.entries()) {
+      if (i === j) continue
+      if (mj.charge > 0) continue
+      if (!overlap(mi.pos, mi.radius, mj.pos, mj.radius)) continue
+      split.add(j)
+      discharge.add(i)
+    }
+  }
+  return { split, discharge }
+}
+
+function resolveMoteCollisions(rng: Rng, motes: Asteroid[]): Asteroid[] {
+  const { split, discharge } = findMoteSplits(motes)
+  const out: Asteroid[] = []
+  for (const [idx, m] of motes.entries()) {
+    if (split.has(idx)) {
+      if (m.radius > ASTEROID_MIN_RADIUS) out.push(spawnChild(rng, m), spawnChild(rng, m))
+      // else: destroyed at min size (same as a bullet hit)
+    } else {
+      out.push(discharge.has(idx) ? { ...m, charge: 0 } : m)
+    }
+  }
+  return out
 }
 
 // Advance existing bullets, age them, cull the expired.
@@ -281,10 +321,12 @@ export function step(world: World, input: Input, dt: number): World {
   const armed: Ship = firing ? { ...ship, fireCooldown: FIRE_COOLDOWN } : ship
 
   // A gather pulse yanks motes inward first (a one-shot velocity kick), then the
-  // continuous field + drift + spin + wrap; finally resolve any (dormant) hits.
+  // continuous field + drift + spin + wrap, then charged↔uncharged mote splits, and
+  // finally any (dormant) bullet hits.
   const kicked = input.pulse ? world.asteroids.map((a) => pulseKick(a, ship.pos)) : world.asteroids
   const moved: Asteroid[] = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt))
-  const hit = resolveCollisions(rng, bullets, moved)
+  const reacted = resolveMoteCollisions(rng, moved)
+  const hit = resolveCollisions(rng, bullets, reacted)
 
   // Keep the field populated (no game-over yet: it's a sandbox).
   const deficit = Math.max(0, TARGET_ASTEROIDS - hit.asteroids.length)

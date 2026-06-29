@@ -8,6 +8,7 @@ import type { FieldMode, World } from './entities'
 const BG = '#0a0a0a'
 const COPPER = '#d98a44'
 const COPPER_DIM = '#b87333'
+const CHARGED = '#f6c98a' // brighter copper for charged motes
 const PULSE_FLASH = 0.35 // seconds the gather-pulse ripple stays visible
 
 export function draw(ctx: CanvasRenderingContext2D, world: World): void {
@@ -85,9 +86,11 @@ function drawField(ctx: CanvasRenderingContext2D, world: World): void {
 }
 
 function drawAsteroids(ctx: CanvasRenderingContext2D, world: World): void {
-  ctx.strokeStyle = COPPER
-  ctx.lineWidth = 2
   for (const a of world.asteroids) {
+    // Charged motes glow brighter and thicker — they're the ones that split others.
+    const charged = a.charge > 0
+    ctx.strokeStyle = charged ? CHARGED : COPPER
+    ctx.lineWidth = charged ? 3 : 2
     ctx.save()
     ctx.translate(a.pos.x, a.pos.y)
     ctx.rotate(a.angle)
