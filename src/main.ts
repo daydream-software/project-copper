@@ -3,7 +3,7 @@
 
 import './style.css'
 import { createWorld, step } from './sim'
-import { DEFAULT_CONFIG, type Config } from './config'
+import type { Config } from './config'
 import { draw } from './render'
 import { createInput } from './input'
 import { createLoop } from './loop'
@@ -23,10 +23,6 @@ if (ctx === null) throw new Error('2d context unavailable')
 
 const input = createInput(window)
 let world: World = createWorld(readSeed(), canvas.width, canvas.height)
-
-// Sandbox config the panel mutates and the loop reads live (it reads this `let` each
-// frame, so reassigning it from the panel takes effect immediately).
-let config: Config = { ...DEFAULT_CONFIG }
 
 function checked(id: string): boolean {
   return document.querySelector<HTMLInputElement>(id)?.checked ?? false
@@ -50,6 +46,12 @@ function readPanel(): Config {
     friction: checked('#opt-friction'),
   }
 }
+
+// Initialise from the panel's actual control state (browsers restore checkbox/radio
+// state across reloads), not from defaults — otherwise a restored setting like Bounce
+// would be shown but ignored. The loop reads this `let` each frame, so reassigning it
+// from the panel takes effect immediately.
+let config: Config = readPanel()
 
 // Piercing / chain reaction only matter when charged motes split, so disable them
 // (the panel dims the nested group) when that's off.

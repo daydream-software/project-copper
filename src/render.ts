@@ -87,10 +87,12 @@ function drawField(ctx: CanvasRenderingContext2D, world: World): void {
 
 function drawAsteroids(ctx: CanvasRenderingContext2D, world: World): void {
   for (const a of world.asteroids) {
-    // Charged motes glow brighter and thicker — they're the ones that split others.
+    // Charged motes glow brighter/thicker — they split others (and spread via conduction).
     const charged = a.charge > 0
     ctx.strokeStyle = charged ? CHARGED : COPPER
     ctx.lineWidth = charged ? 3 : 2
+    ctx.shadowBlur = charged ? 10 : 0
+    ctx.shadowColor = charged ? CHARGED : 'transparent'
     ctx.save()
     ctx.translate(a.pos.x, a.pos.y)
     ctx.rotate(a.angle)
@@ -105,6 +107,7 @@ function drawAsteroids(ctx: CanvasRenderingContext2D, world: World): void {
     ctx.stroke()
     ctx.restore()
   }
+  ctx.shadowBlur = 0 // don't let the charged-mote glow bleed into the bullets/ship
 }
 
 function drawBullets(ctx: CanvasRenderingContext2D, world: World): void {

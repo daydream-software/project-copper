@@ -52,11 +52,12 @@ unit test.
 
 ### Slice M1 — mode pack: charge & physics (done)
 
-Four sandbox toggles: **conduction** (a charged hit *spreads* charge to the touched
-mote instead of shattering — overrides split; `resolveMoteCollisions`), **charged
-repel** (charged motes push each other apart; `applyChargedRepel`), **gravity well**
-(motes pulled to the arena centre) and **friction** (mote drag) — both in `stepMote`
-(field force extracted to `fieldForce`). Each has a discriminating test.
+Four sandbox toggles: **conduction** (charged motes energize uncharged ones within
+`CONDUCTION_RANGE` — a proximity pass, `applyConduction`, that runs *alongside* split,
+not instead of it; charged motes glow), **charged repel** (charged motes push each other
+apart; `applyChargedRepel`), **gravity well** (motes pulled to the arena centre) and
+**friction** (mote drag) — both in `stepMote` (field force extracted to `fieldForce`).
+Each has a discriminating test.
 
 ## Next — the open ladder (more mode packs)
 

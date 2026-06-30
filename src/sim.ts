@@ -53,6 +53,7 @@ const WELL_K = 1.8 // gravity-well pull toward the arena centre, 1/s^2 (sandbox 
 const MOTE_DRAG = 0.5 // friction: fraction of mote velocity shed per second (sandbox toggle)
 const CHARGED_REPEL_RANGE = 95 // reach of charged-mote mutual repulsion, px
 const CHARGED_REPEL_STRENGTH = 700 // charged-mote mutual repulsion at the centre, px/s^2
+const CONDUCTION_RANGE = 130 // a charged mote energizes uncharged motes within this, px
 
 // Charge lasts longer on bigger motes (proportional to radius): a base-size mote holds
 // MOTE_CHARGE_TIME, a small fragment proportionally less.
@@ -271,6 +272,23 @@ function applyChargedRepel(motes: Asteroid[], dt: number): Asteroid[] {
   })
 }
 
+// Conduction (sandbox toggle): an uncharged mote within CONDUCTION_RANGE of any charged
+// mote becomes charged — current spreading through nearby conductors. Runs as its own
+// pass, so it works alongside split (split shatters on contact; conduction lights up the
+// surroundings). Charge still decays, so the glow follows wherever motes cluster.
+function applyConduction(motes: Asteroid[]): Asteroid[] {
+  return motes.map((m) => {
+    if (m.charge > 0) return m
+    for (const o of motes) {
+      if (o.charge <= 0) continue
+      const dx = m.pos.x - o.pos.x
+      const dy = m.pos.y - o.pos.y
+      if (dx * dx + dy * dy < CONDUCTION_RANGE * CONDUCTION_RANGE) return { ...m, charge: chargeTimeFor(m.radius) }
+    }
+    return m
+  })
+}
+
 // A charged mote that overlaps an uncharged one triggers the bullet-style split.
 // Charged↔charged and uncharged↔uncharged do nothing. Returns the uncharged motes hit
 // (`targets`) and the charged motes that hit something (`chargers`).
@@ -293,11 +311,6 @@ function findMoteSplits(motes: Asteroid[]): { targets: Set<number>, chargers: Se
 function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Asteroid[] {
   if (motes.length >= MAX_MOTES) return motes // safety valve: stop splitting (chain guard)
   const { targets, chargers } = findMoteSplits(motes)
-  // Conduction: charge spreads to the touched motes instead of shattering them (it
-  // takes precedence over split — a current running through the field, not a fracture).
-  if (config.conduction) {
-    return motes.map((m, idx) => (targets.has(idx) ? { ...m, charge: chargeTimeFor(m.radius) } : m))
-  }
   const out: Asteroid[] = []
   for (const [idx, m] of motes.entries()) {
     // Both motes shatter on a charged hit — including the charger itself, unless
@@ -389,11 +402,13 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
   const kicked = input.pulse ? world.asteroids.map((a) => pulseKick(a, ship.pos)) : world.asteroids
   const moved: Asteroid[] = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, config))
   const repelled = config.chargedRepel ? applyChargedRepel(moved, dt) : moved
-  const reacted = config.chargedSplit || config.conduction ? resolveMoteCollisions(rng, repelled, config) : repelled
+  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, repelled, config) : repelled
   const hit = resolveCollisions(rng, bullets, reacted)
+  // Conduction runs last, alongside everything: it spreads charge through nearby motes.
+  const conducted = config.conduction ? applyConduction(hit.asteroids) : hit.asteroids
 
   // Keep the field populated (no game-over yet: it's a sandbox).
-  const deficit = Math.max(0, TARGET_ASTEROIDS - hit.asteroids.length)
+  const deficit = Math.max(0, TARGET_ASTEROIDS - conducted.length)
   const refill = [...Array(deficit).keys()].map(() =>
     spawnAsteroid(rng, world.width, world.height, ASTEROID_BASE_RADIUS, armed.pos),
   )
@@ -403,7 +418,7 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
     height: world.height,
     ship: armed,
     bullets: hit.bullets,
-    asteroids: [...hit.asteroids, ...refill],
+    asteroids: [...conducted, ...refill],
     rngState: rng.s,
     t: world.t + dt,
   }

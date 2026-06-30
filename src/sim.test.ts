@@ -239,13 +239,13 @@ describe('sandbox config', () => {
 })
 
 describe('physics & charge modes', () => {
-  const contact = () => [moteAt(300, 300, 48, 2), moteAt(300, 300, 48, 0)]
-
-  it('conduction spreads charge to a touched mote instead of shattering it', () => {
-    const w = step(makeWorld({ asteroids: contact() }), NONE, DT, cfg({ conduction: true }))
-    expect(w.asteroids.filter((a) => a.radius < 40)).toHaveLength(0) // nothing shattered
-    expect(w.asteroids[0].charge).toBeGreaterThan(0)
-    expect(w.asteroids[1].charge).toBeGreaterThan(0) // the formerly-uncharged mote is now charged
+  it('conduction charges a nearby uncharged mote — alongside split, not instead of it', () => {
+    const near = () => [moteAt(300, 300, 48, 2), moteAt(410, 300, 48, 0)] // 110px apart: within conduction range, not overlapping
+    for (const chargedSplit of [false, true]) {
+      const w = step(makeWorld({ asteroids: near() }), NONE, DT, cfg({ conduction: true, chargedSplit }))
+      expect(w.asteroids[1].charge).toBeGreaterThan(0) // the nearby uncharged mote got energized
+      expect(w.asteroids.filter((a) => a.radius < 40)).toHaveLength(0) // not overlapping → nothing shattered
+    }
   })
 
   it('charged motes repel each other', () => {
