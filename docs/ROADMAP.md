@@ -84,8 +84,10 @@ post-movement passes were factored into `reactMotes` to keep it flat.
 The arena `edges` mode grew from wrap/bounce to four: **kill** (motes die at the edge;
 the ship clamps — no game-over) and **circle** (a centred circular arena everything
 bounces off). The per-axis `edge` helper became a unified `bound()` in `geometry.ts`
-(rectangle axes or a circle reflection, returning a `dead` flag); the circle is drawn in
-`render.ts`. Panel "Arena" radio: Wrap / Bounce / Kill / Circle.
+(rectangle axes or a circle reflection, returning a `dead` flag). In circle mode the
+canvas element itself is **clipped to a circle** (`clip-path: circle(closest-side)` in
+`main.ts`) so the arena *is* the circle, not a circle inside a rectangle. Panel "Arena"
+radio: Wrap / Bounce / Kill / Circle.
 
 ## Next — the open ladder (more mode packs)
 

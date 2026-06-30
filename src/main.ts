@@ -85,6 +85,12 @@ function applyAudio(): void {
   setSfx(checked('#opt-sfx'))
 }
 
+// In circle mode, clip the canvas itself to a circle so the arena *is* the circle
+// (the rectangular corners/margins are hidden), not a circle drawn inside a rectangle.
+function applyArenaShape(): void {
+  if (canvas !== null) canvas.style.clipPath = config.edges === 'circle' ? 'circle(closest-side)' : ''
+}
+
 // Browsers block audio until a user gesture. On the first one, resume the context AND
 // (re)apply the panel's music choice — so a track the browser restored on refresh
 // actually starts playing, matching what the panel shows.
@@ -107,6 +113,7 @@ function updateHint(): void {
 updateHint()
 syncEnablement()
 applyAudio()
+applyArenaShape()
 
 const panel = document.querySelector<HTMLElement>('#panel')
 if (panel !== null) {
@@ -115,6 +122,7 @@ if (panel !== null) {
     updateHint()
     syncEnablement()
     applyAudio()
+    applyArenaShape()
     // Blur the control so the next space/shift goes to the game, not the checkbox.
     if (e.target instanceof HTMLElement) e.target.blur()
   })
