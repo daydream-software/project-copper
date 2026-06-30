@@ -5,7 +5,7 @@
 import { FIELD_RANGE, PULSE_RANGE } from './sim'
 import type { Config } from './config'
 import type { Vec2 } from './geometry'
-import type { FieldMode, World } from './entities'
+import type { Asteroid, FieldMode, World } from './entities'
 
 interface Palette { bg: string, stroke: string, dim: string, charged: string }
 
@@ -25,9 +25,11 @@ export interface Ghost { x: number, y: number, angle: number, radius: number, sh
 
 // The active palette for this frame — set at the top of draw(), read by the helpers.
 let active: Palette = PALETTES.copper
+let showPolarity = false // draw +/- marks on charged motes (bipolar mode)
 
 export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config, grains: TrailDot[], ghosts: Ghost[]): void {
   active = PALETTES[config.palette]
+  showPolarity = config.bipolar
   ctx.fillStyle = active.bg // full opaque clear — no fade residue ever
   ctx.fillRect(0, 0, world.width, world.height)
   ctx.lineJoin = 'round'
@@ -173,8 +175,22 @@ function drawAsteroids(ctx: CanvasRenderingContext2D, world: World): void {
     ctx.closePath()
     ctx.stroke()
     ctx.restore()
+    drawPolarityMark(ctx, a, charged)
   }
   ctx.shadowBlur = 0 // don't let the charged-mote glow bleed into the bullets/ship
+}
+
+// In bipolar mode, mark a charged mote's polarity with a + (positive) or − (negative).
+function drawPolarityMark(ctx: CanvasRenderingContext2D, a: Asteroid, charged: boolean): void {
+  if (!showPolarity || !charged) return
+  ctx.beginPath()
+  ctx.moveTo(a.pos.x - 4, a.pos.y)
+  ctx.lineTo(a.pos.x + 4, a.pos.y)
+  if ((a.polarity ?? 1) > 0) {
+    ctx.moveTo(a.pos.x, a.pos.y - 4)
+    ctx.lineTo(a.pos.x, a.pos.y + 4)
+  }
+  ctx.stroke()
 }
 
 function drawBullets(ctx: CanvasRenderingContext2D, world: World): void {

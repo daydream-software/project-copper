@@ -54,6 +54,10 @@ const MOTE_DRAG = 0.5 // friction: fraction of mote velocity shed per second (sa
 const CHARGED_REPEL_RANGE = 95 // reach of charged-mote mutual repulsion, px
 const CHARGED_REPEL_STRENGTH = 700 // charged-mote mutual repulsion at the centre, px/s^2
 const CONDUCTION_RANGE = 130 // a charged mote energizes uncharged motes within this, px
+const BIPOLAR_RANGE = 110 // reach of bipolar +/- forces between charged motes, px
+const BIPOLAR_STRENGTH = 700 // bipolar force at the centre, px/s^2
+const BURST_RADIUS = 130 // a shatter shoves motes within this outward, px
+const BURST_STRENGTH = 260 // burst outward velocity kick at the centre, px/s
 const MOTE_RESTITUTION = 0.85 // bounciness of mote↔mote elastic collisions (sandbox toggle)
 const FLOW_SCALE = 0.012 // flow-field spatial frequency, 1/px (sandbox toggle)
 const FLOW_FORCE = 120 // flow-field push, px/s^2
@@ -93,6 +97,7 @@ function spawnAsteroid(rng: Rng, width: number, height: number, radius: number, 
     spin: (random(rng) * 2 - 1) * ASTEROID_MAX_SPIN,
     shape: makeShape(rng, range(rng, ASTEROID_POINTS_MIN, ASTEROID_POINTS_MAX)),
     charge: 0,
+    polarity: random(rng) < 0.5 ? -1 : 1,
   }
 }
 
@@ -107,6 +112,7 @@ function spawnChild(rng: Rng, parent: Asteroid, childCharge: number): Asteroid {
     spin: (random(rng) * 2 - 1) * ASTEROID_MAX_SPIN,
     shape: makeShape(rng, range(rng, ASTEROID_POINTS_MIN, ASTEROID_POINTS_MAX)),
     charge: childCharge,
+    polarity: random(rng) < 0.5 ? -1 : 1,
   }
 }
 
@@ -242,6 +248,10 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
     vx *= drag
     vy *= drag
   }
+  if (config.stasis && a.charge > 0) {
+    vx = 0 // stasis: a charged mote is frozen in place
+    vy = 0
+  }
   const speed = Math.hypot(vx, vy)
   if (speed > MOTE_MAX_SPEED) {
     vx = (vx / speed) * MOTE_MAX_SPEED
@@ -275,6 +285,30 @@ function applyChargedRepel(motes: Asteroid[], dt: number): Asteroid[] {
       const push = CHARGED_REPEL_STRENGTH * (1 - d / CHARGED_REPEL_RANGE) * dt
       vx += (dx / d) * push
       vy += (dy / d) * push
+    }
+    return { ...m, vel: { x: vx, y: vy } }
+  })
+}
+
+// Bipolar (sandbox toggle): charged motes interact by their intrinsic polarity — like
+// poles repel, opposite poles attract — within BIPOLAR_RANGE.
+function applyBipolar(motes: Asteroid[], dt: number): Asteroid[] {
+  return motes.map((m, i) => {
+    if (m.charge <= 0) return m
+    const pm = m.polarity ?? 1
+    let vx = m.vel.x
+    let vy = m.vel.y
+    for (const [j, o] of motes.entries()) {
+      if (i === j || o.charge <= 0) continue
+      const dx = m.pos.x - o.pos.x
+      const dy = m.pos.y - o.pos.y
+      const d2 = dx * dx + dy * dy
+      if (d2 <= 0 || d2 >= BIPOLAR_RANGE * BIPOLAR_RANGE) continue
+      const d = Math.sqrt(d2)
+      const sign = pm === (o.polarity ?? 1) ? 1 : -1 // like → push apart, opposite → pull together
+      const f = BIPOLAR_STRENGTH * (1 - d / BIPOLAR_RANGE) * dt * sign
+      vx += (dx / d) * f
+      vy += (dy / d) * f
     }
     return { ...m, vel: { x: vx, y: vy } }
   })
@@ -355,15 +389,34 @@ function findMoteSplits(motes: Asteroid[]): { targets: Set<number>, chargers: Se
   return { targets, chargers }
 }
 
+// Burst: shove a mote outward from each shatter centre within BURST_RADIUS.
+function burstPush(m: Asteroid, centers: Vec2[]): Asteroid {
+  let vx = m.vel.x
+  let vy = m.vel.y
+  for (const c of centers) {
+    const dx = m.pos.x - c.x
+    const dy = m.pos.y - c.y
+    const d2 = dx * dx + dy * dy
+    if (d2 <= 0 || d2 >= BURST_RADIUS * BURST_RADIUS) continue
+    const d = Math.sqrt(d2)
+    const k = BURST_STRENGTH * (1 - d / BURST_RADIUS)
+    vx += (dx / d) * k
+    vy += (dy / d) * k
+  }
+  return { ...m, vel: { x: vx, y: vy } }
+}
+
 function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Asteroid[] {
   if (motes.length >= MAX_MOTES) return motes // safety valve: stop splitting (chain guard)
   const { targets, chargers } = findMoteSplits(motes)
   const out: Asteroid[] = []
+  const bursts: Vec2[] = []
   for (const [idx, m] of motes.entries()) {
     // Both motes shatter on a charged hit — including the charger itself, unless
     // piercing, where it survives whole (keeping its charge) and plows through.
     const shatters = targets.has(idx) || (chargers.has(idx) && !config.piercing)
     if (shatters) {
+      if (config.burst) bursts.push(m.pos) // overcharge → shockwave centre
       if (m.radius > ASTEROID_MIN_RADIUS) {
         // Chain reaction: fragments are born charged (duration scaled to their size).
         const cc = config.chainReaction ? chargeTimeFor(m.radius * CHILD_SCALE) : 0
@@ -374,7 +427,7 @@ function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Ast
       out.push(m)
     }
   }
-  return out
+  return bursts.length > 0 ? out.map((m) => burstPush(m, bursts)) : out
 }
 
 // Advance existing bullets, age them, cull the expired.
@@ -433,7 +486,8 @@ function resolveCollisions(rng: Rng, bullets: Bullet[], asteroids: Asteroid[]): 
 // charged-split, (dormant) bullet hits, then conduction.
 function reactMotes(rng: Rng, motes: Asteroid[], bullets: Bullet[], config: Config, dt: number): { asteroids: Asteroid[], bullets: Bullet[] } {
   const repelled = config.chargedRepel ? applyChargedRepel(motes, dt) : motes
-  const bounced = config.moteCollision ? resolveMoteBounce(repelled) : repelled
+  const bip = config.bipolar ? applyBipolar(repelled, dt) : repelled
+  const bounced = config.moteCollision ? resolveMoteBounce(bip) : bip
   const reacted = config.chargedSplit ? resolveMoteCollisions(rng, bounced, config) : bounced
   const hit = resolveCollisions(rng, bullets, reacted)
   const conducted = config.conduction ? applyConduction(hit.asteroids) : hit.asteroids

@@ -25,6 +25,12 @@ export interface Config {
   conduction: boolean
   /** Charged motes push each other apart. */
   chargedRepel: boolean
+  /** Charged motes interact by polarity: opposite poles attract, like poles repel. */
+  bipolar: boolean
+  /** A shatter releases an outward shockwave that shoves nearby motes. */
+  burst: boolean
+  /** Charged motes freeze in place (stasis). */
+  stasis: boolean
   /** Motes are pulled toward the arena centre (a gravity well). */
   well: boolean
   /** Motes lose speed over time (drag). */
@@ -54,6 +60,9 @@ export const DEFAULT_CONFIG: Config = {
   chainReaction: false,
   conduction: false,
   chargedRepel: false,
+  bipolar: false,
+  burst: false,
+  stasis: false,
   well: false,
   friction: false,
   moteCollision: false,

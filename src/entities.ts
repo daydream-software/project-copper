@@ -50,6 +50,9 @@ export interface Asteroid {
   /** Seconds of charge remaining: a mote is "charged" after the field touches it,
    * and a charged mote splits an uncharged one on contact. Decays to 0. */
   charge: number
+  /** Intrinsic polarity (-1 or +1), assigned at spawn. Only used by the bipolar mode
+   * (opposite poles attract, like poles repel). Optional → defaults to +1. */
+  polarity?: number
 }
 
 /** The per-step intent collected from the keyboard. */

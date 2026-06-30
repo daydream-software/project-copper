@@ -89,9 +89,21 @@ bounces off). The per-axis `edge` helper became a unified `bound()` in `geometry
 dropped, so the arena *is* the circle (corners show the page bg), not a circle floating in
 a rectangle. Panel "Arena" radio: Wrap / Bounce / Kill / Circle.
 
+### Slice M5 — mode pack: advanced charge (done)
+
+The last charge pack — three toggles deepening the charged-mote interactions.
+**Bipolar** gives every mote an intrinsic polarity (`polarity: ±1` on `Asteroid`,
+seeded in `spawnAsteroid` / `spawnChild`); charged motes then attract opposite poles
+and repel like ones (`applyBipolar`, force ∝ `1 - d/BIPOLAR_RANGE`), and the renderer
+marks each charged mote with a **+** or **−** (`drawPolarityMark`). **Burst** turns
+every shatter into a shockwave — bystanders within `BURST_RADIUS` get an outward kick
+(`burstPush`, fed shatter centres collected in `resolveMoteCollisions`). **Stasis**
+freezes charged motes in place (`stepMote` zeroes velocity while `charge > 0`) — a
+charged mote becomes a fixed anchor. Each has a discriminating test (opposite poles
+attract / like repel, a bystander is shoved on shatter, a charged mote holds still).
+
 ## Next — the open ladder (more mode packs)
 
-- **Pack: more charge** — bipolar +/- charge, overcharge→burst, stasis.
 - **Arena extra** — static obstacles/pillars to bounce off.
 - **Pack: ship & juice** — ship collision (bounce, no game-over), dash, magnetic hull,
   debris particles on shatter (needs shatter positions from the sim).

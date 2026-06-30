@@ -285,6 +285,28 @@ describe('physics & charge modes', () => {
   })
 })
 
+describe('advanced charge modes', () => {
+  it('bipolar: opposite poles attract, like poles repel', () => {
+    const make = (x: number, pol: number) => ({ pos: { x, y: 300 }, vel: { x: 0, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 2, polarity: pol })
+    const opp = step(makeWorld({ asteroids: [make(300, 1), make(360, -1)] }), NONE, DT, cfg({ bipolar: true }))
+    expect(opp.asteroids[0].vel.x).toBeGreaterThan(0) // + pulled toward the − on its right
+    const like = step(makeWorld({ asteroids: [make(300, 1), make(360, 1)] }), NONE, DT, cfg({ bipolar: true }))
+    expect(like.asteroids[0].vel.x).toBeLessThan(0) // + pushed from the + on its right
+  })
+
+  it('burst shoves a bystander mote outward on a shatter', () => {
+    const motes = [moteAt(300, 300, 48, 2), moteAt(300, 300, 48, 0), moteAt(380, 300, 30, 0)]
+    const w = step(makeWorld({ asteroids: motes }), NONE, DT, cfg({ burst: true }))
+    expect(w.asteroids.find((a) => a.radius === 30)?.vel.x ?? 0).toBeGreaterThan(0) // shoved from the shatter at x=300
+  })
+
+  it('stasis freezes a charged mote in place', () => {
+    const m = { pos: { x: 300, y: 300 }, vel: { x: 200, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 2 }
+    const w = step(makeWorld({ asteroids: [m] }), NONE, DT, cfg({ stasis: true }))
+    expect(w.asteroids[0].vel.x).toBe(0)
+  })
+})
+
 describe('edges mode', () => {
   const fastShip = { pos: { x: 799, y: 300 }, vel: { x: 300, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' as const, charge: 0, pulseT: 99 }
 
