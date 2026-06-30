@@ -28,12 +28,15 @@ function checked(id: string): boolean {
   return document.querySelector<HTMLInputElement>(id)?.checked ?? false
 }
 
+function radio(name: string): string | undefined {
+  return document.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)?.value
+}
+
 function readPanel(): Config {
-  const gather = document.querySelector<HTMLInputElement>('input[name="gather"]:checked')?.value
-  const edges = document.querySelector<HTMLInputElement>('input[name="edges"]:checked')?.value
+  const palette = radio('palette')
   return {
-    gather: gather === 'attract' ? 'attract' : 'pulse',
-    edges: edges === 'bounce' ? 'bounce' : 'wrap',
+    gather: radio('gather') === 'attract' ? 'attract' : 'pulse',
+    edges: radio('edges') === 'bounce' ? 'bounce' : 'wrap',
     scatter: checked('#opt-scatter'),
     vortex: checked('#opt-vortex'),
     gun: checked('#opt-gun'),
@@ -44,6 +47,9 @@ function readPanel(): Config {
     chargedRepel: checked('#opt-chargedRepel'),
     well: checked('#opt-well'),
     friction: checked('#opt-friction'),
+    trails: checked('#opt-trails'),
+    shake: checked('#opt-shake'),
+    palette: palette === 'mono' || palette === 'neon' ? palette : 'copper',
   }
 }
 
@@ -70,9 +76,12 @@ function applyAudio(): void {
   setSfx(checked('#opt-sfx'))
 }
 
-// Browsers block audio until a user gesture — resume on the first one.
+// Browsers block audio until a user gesture. On the first one, resume the context AND
+// (re)apply the panel's music choice — so a track the browser restored on refresh
+// actually starts playing, matching what the panel shows.
 const onFirstGesture = (): void => {
   resumeAudio()
+  applyAudio()
 }
 window.addEventListener('pointerdown', onFirstGesture, { once: true })
 window.addEventListener('keydown', onFirstGesture, { once: true })
@@ -106,9 +115,10 @@ if (panel !== null) {
   })
 }
 
-// SFX are driven by observable changes in the world (the sim itself stays silent).
+// SFX and screen-shake are driven by observable changes in the world (sim stays silent).
 let prevPulseT = world.ship.pulseT
 let prevCount = world.asteroids.length
+let shake = 0 // current screen-shake magnitude, px
 
 const loop = createLoop(
   (dt) => {
@@ -118,9 +128,16 @@ const loop = createLoop(
     world = step(world, { ...input.state, pulse: config.gather === 'pulse' ? pulse : false }, dt, config)
   },
   () => {
-    draw(ctx, world)
-    if (world.ship.pulseT < 0.05 && prevPulseT > 0.1) sfxPulse() // a gather pulse just fired
-    if (world.asteroids.length > prevCount) sfxShatter() // motes split (heuristic: count grew)
+    draw(ctx, world, config)
+    const grew = world.asteroids.length > prevCount // motes split (heuristic: count grew)
+    if (world.ship.pulseT < 0.05 && prevPulseT > 0.1) sfxPulse()
+    if (grew) sfxShatter()
+    // Screen-shake: kick on a shatter, decay each frame, jitter the canvas element.
+    if (grew && config.shake) shake = 8
+    shake *= 0.85
+    canvas.style.transform = config.shake && shake > 0.4
+      ? `translate(${(Math.random() * 2 - 1) * shake}px, ${(Math.random() * 2 - 1) * shake}px)`
+      : ''
     prevPulseT = world.ship.pulseT
     prevCount = world.asteroids.length
   },

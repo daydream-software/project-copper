@@ -59,13 +59,22 @@ apart; `applyChargedRepel`), **gravity well** (motes pulled to the arena centre)
 **friction** (mote drag) — both in `stepMote` (field force extracted to `fieldForce`).
 Each has a discriminating test.
 
+### Slice M2 — mode pack: juice (done)
+
+Visual sandbox toggles, view/main side: **palette** (copper / mono / neon — `render.ts`
+PALETTES), **trails** (the canvas fades instead of clearing), **screen-shake** on
+shatters (`main.ts` jitters the canvas element). Charged motes also gained a glow. The
+audio-on-refresh gap is closed too: a music track the browser restores now starts on the
+first user gesture (`onFirstGesture` re-applies the panel), so the panel matches what
+plays.
+
 ## Next — the open ladder (more mode packs)
 
 - **Pack: more charge** — bipolar +/- charge, overcharge→burst, stasis.
 - **Pack: physics** — mote↔mote elastic collisions, flow field.
 - **Pack: arena** — circular arena, obstacles/walls, kill-edges.
 - **Pack: ship & juice** — ship collision (bounce, no game-over), dash, magnetic hull,
-  trails, debris on shatter, screen-shake, palette themes.
+  debris particles on shatter (needs shatter positions from the sim).
 
 ### Older notes
 

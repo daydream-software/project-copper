@@ -28,6 +28,12 @@ export interface Config {
   well: boolean
   /** Motes lose speed over time (drag). */
   friction: boolean
+  /** Motion trails (the canvas fades instead of clearing each frame). */
+  trails: boolean
+  /** Screen-shake on shatters. */
+  shake: boolean
+  /** Colour theme. */
+  palette: 'copper' | 'mono' | 'neon'
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -43,4 +49,7 @@ export const DEFAULT_CONFIG: Config = {
   chargedRepel: false,
   well: false,
   friction: false,
+  trails: false,
+  shake: false,
+  palette: 'copper',
 }
