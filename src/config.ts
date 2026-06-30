@@ -51,12 +51,16 @@ export interface Config {
   pillarSize: number
   /** Motes are pulled toward the arena centre (a gravity well). */
   well: boolean
+  /** Where the gravity well pulls toward: the arena `centre` or the `ship` (it follows). */
+  wellAnchor: 'centre' | 'ship'
   /** Motes lose speed over time (drag). */
   friction: boolean
   /** Motes bounce off each other (billiards) instead of passing through. */
   moteCollision: boolean
   /** A static swirl field pushes the motes like currents. */
   flow: boolean
+  /** Where the flow field is anchored: the fixed world (`centre`) or the `ship` (it follows). */
+  flowAnchor: 'centre' | 'ship'
   /** Motion trails: `off`, a faint `dust`, or `full` shape outlines. */
   trails: 'dust' | 'full' | 'off'
   /** Whether the motes trail too (off = only the ship trails). */
@@ -100,9 +104,11 @@ export const DEFAULT_CONFIG: Config = {
   pillarCount: 0,
   pillarSize: 40,
   well: false,
+  wellAnchor: 'centre',
   friction: false,
   moteCollision: false,
   flow: false,
+  flowAnchor: 'centre',
   trails: 'off',
   trailMotes: true,
   shake: false,

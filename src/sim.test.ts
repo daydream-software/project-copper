@@ -210,6 +210,15 @@ describe('physics & charge modes', () => {
     expect(w.asteroids[0].vel.x).toBeGreaterThan(0) // centre is at x=400 → pulled right
   })
 
+  it('the gravity well can anchor to the ship instead of the centre', () => {
+    const ship = { ...makeWorld().ship, pos: { x: 600, y: 300 } } // off-centre (centre is 400,300)
+    // Mote sits exactly on the arena centre, so a centre-anchored well gives it no horizontal pull.
+    const pull = (anchor: 'centre' | 'ship'): number =>
+      step(makeWorld({ ship, asteroids: [moteAt(400, 300, 30, 0)] }), NONE, DT, cfg({ well: true, wellAnchor: anchor })).asteroids[0].vel.x
+    expect(pull('centre')).toBe(0) // centred mote ↔ centre well → no pull
+    expect(pull('ship')).toBeGreaterThan(0) // pulled toward the ship on its right
+  })
+
   it('friction bleeds a mote speed', () => {
     const fast = { pos: { x: 300, y: 300 }, vel: { x: 200, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 0 }
     const w = step(makeWorld({ asteroids: [fast] }), NONE, DT, cfg({ friction: true }))
@@ -246,6 +255,16 @@ describe('physics & charge modes', () => {
   it('the flow field pushes a still mote', () => {
     const w = step(makeWorld({ asteroids: [moteAt(300, 300, 30, 0)] }), NONE, DT, cfg({ flow: true }))
     expect(Math.hypot(w.asteroids[0].vel.x, w.asteroids[0].vel.y)).toBeGreaterThan(0)
+  })
+
+  it('the flow field can anchor to the ship instead of the fixed world', () => {
+    const ship = { ...makeWorld().ship, pos: { x: 200, y: 150 } } // off the world origin
+    // The swirl is periodic, so don't predict a direction — just prove the anchor moves the sample.
+    const vel = (anchor: 'centre' | 'ship'): { x: number, y: number } => {
+      const v = step(makeWorld({ ship, asteroids: [moteAt(300, 300, 30, 0)] }), NONE, DT, cfg({ flow: true, flowAnchor: anchor })).asteroids[0].vel
+      return { x: v.x, y: v.y }
+    }
+    expect(vel('ship')).not.toEqual(vel('centre'))
   })
 })
 

@@ -12,7 +12,7 @@ const ALL: Config = cfg({
   gun: true, chargedSplit: false, piercing: true, chainReaction: true, conduction: true,
   chargedRepel: true, bipolar: true, burst: true, stasis: true,
   moteCount: 12, moteSize: 60, moteDrift: 100,
-  well: true, friction: true, moteCollision: true, flow: true,
+  well: true, wellAnchor: 'ship', friction: true, moteCollision: true, flow: true, flowAnchor: 'ship',
   trails: 'full', trailMotes: false, shake: true, debris: true,
   pillarCount: 4, pillarSize: 56, palette: 'neon',
   customPalette: true, customBg: '#123456', customFront: '#abcdef',

@@ -75,9 +75,17 @@
       <fieldset>
         <legend>Physics</legend>
         <label><input type="checkbox" id="opt-well" /> Gravity well</label>
+        <div class="sub row">
+          <label><input type="radio" name="wellAnchor" value="centre" checked /> Centre</label>
+          <label><input type="radio" name="wellAnchor" value="ship" /> Ship</label>
+        </div>
         <label><input type="checkbox" id="opt-friction" /> Friction</label>
         <label><input type="checkbox" id="opt-moteCollision" /> Mote collisions</label>
         <label><input type="checkbox" id="opt-flow" /> Flow field</label>
+        <div class="sub row">
+          <label><input type="radio" name="flowAnchor" value="centre" checked /> Centre</label>
+          <label><input type="radio" name="flowAnchor" value="ship" /> Ship</label>
+        </div>
       </fieldset>
       <fieldset>
         <legend>Palette</legend>

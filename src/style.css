@@ -216,6 +216,12 @@ main {
   opacity: 0.4;
 }
 
+/* A horizontal sub-group (e.g. an anchor's Centre / Ship radios sit side by side). */
+#panel .sub.row {
+  flex-direction: row;
+  gap: 0.8rem;
+}
+
 #panel input:disabled,
 #panel input:disabled + * {
   cursor: default;

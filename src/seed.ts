@@ -59,6 +59,8 @@ export const SCHEMA: readonly Field[] = [
   { key: 'customPalette', kind: 'bool' },
   { key: 'customBg', kind: 'color' },
   { key: 'customFront', kind: 'color' },
+  { key: 'wellAnchor', kind: 'enum', options: ['centre', 'ship'] },
+  { key: 'flowAnchor', kind: 'enum', options: ['centre', 'ship'] },
 ]
 
 // #rrggbb ↔ 24-bit int (clamped).

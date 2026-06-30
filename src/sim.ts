@@ -174,19 +174,31 @@ function fieldForce(ship: Ship, a: Asteroid, dt: number, config: Config, width: 
   return { vx: vx + ux * mag, vy: vy + uy * mag, touched: true }
 }
 
+// Where a centre/ship-anchored force originates: the ship's position when it follows the
+// ship, else the given fixed point (the arena centre for the well, the world origin for flow).
+function anchorPoint(anchor: 'centre' | 'ship', ship: Ship, fixedX: number, fixedY: number): Vec2 {
+  return anchor === 'ship' ? { x: ship.pos.x, y: ship.pos.y } : { x: fixedX, y: fixedY }
+}
+
 // Drift a mote: polarity field, then gravity well + friction (sandbox toggles), clamp,
 // move + spin (wrapping or bouncing). The field touching it (re)charges it.
 function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number, config: Config, pillars: Pillar[]): Asteroid | null {
   const f = fieldForce(ship, a, dt, config, width, height)
   let { vx, vy } = f
   if (config.well) {
-    vx += (width / 2 - a.pos.x) * WELL_K * dt
-    vy += (height / 2 - a.pos.y) * WELL_K * dt
+    // Pull toward the arena centre, or toward the ship when the well follows it.
+    const w = anchorPoint(config.wellAnchor, ship, width / 2, height / 2)
+    vx += (w.x - a.pos.x) * WELL_K * dt
+    vy += (w.y - a.pos.y) * WELL_K * dt
   }
   if (config.flow) {
-    // A static swirl field: motes drift along it like currents.
-    vx += Math.cos(a.pos.y * FLOW_SCALE) * FLOW_FORCE * dt
-    vy += Math.sin(a.pos.x * FLOW_SCALE) * FLOW_FORCE * dt
+    // A static swirl field: motes drift along it like currents. 'centre' = the fixed world
+    // field (sampled from origin 0); 'ship' shifts the sample so the swirl centres on (and
+    // follows) the ship. 'centre' is origin-0, NOT the arena centre — offsetting it would
+    // shift every existing flow seed by ~0.7 of a period, so the default must stay origin-0.
+    const f = anchorPoint(config.flowAnchor, ship, 0, 0)
+    vx += Math.cos((a.pos.y - f.y) * FLOW_SCALE) * FLOW_FORCE * dt
+    vy += Math.sin((a.pos.x - f.x) * FLOW_SCALE) * FLOW_FORCE * dt
   }
   if (config.friction) {
     const drag = Math.max(0, 1 - MOTE_DRAG * dt)

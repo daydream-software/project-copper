@@ -43,6 +43,11 @@ function colour(id: string, fallback: string): string {
   return document.querySelector<HTMLInputElement>(id)?.value ?? fallback
 }
 
+// A centre/ship anchor radio's value (anything but 'ship' → the default 'centre').
+function anchorOf(name: string): 'centre' | 'ship' {
+  return radio(name) === 'ship' ? 'ship' : 'centre'
+}
+
 function readPanel(): Config {
   const palette = radio('palette')
   const trails = radio('trails')
@@ -71,9 +76,11 @@ function readPanel(): Config {
     pillarCount: num('#opt-pillarCount', 0),
     pillarSize: num('#opt-pillarSize', 40),
     well: checked('#opt-well'),
+    wellAnchor: anchorOf('wellAnchor'),
     friction: checked('#opt-friction'),
     moteCollision: checked('#opt-moteCollision'),
     flow: checked('#opt-flow'),
+    flowAnchor: anchorOf('flowAnchor'),
     trails: trails === 'dust' || trails === 'full' ? trails : 'off',
     trailMotes: checked('#opt-trailMotes'),
     shake: checked('#opt-shake'),
@@ -106,6 +113,8 @@ function writePanel(c: Config): void {
   setRadio('edges', c.edges)
   setRadio('palette', c.palette)
   setRadio('trails', c.trails)
+  setRadio('wellAnchor', c.wellAnchor)
+  setRadio('flowAnchor', c.flowAnchor)
   const checks: Array<[string, boolean]> = [
     ['#opt-scatter', c.scatter], ['#opt-vortex', c.vortex], ['#opt-gun', c.gun],
     ['#opt-chargedSplit', c.chargedSplit], ['#opt-piercing', c.piercing], ['#opt-chainReaction', c.chainReaction],
@@ -152,11 +161,18 @@ function disable(id: string, off: boolean): void {
   if (el !== null) el.disabled = off
 }
 
+// Disable every control matching a selector (e.g. a whole radio group) — the `.sub` dims via CSS.
+function disableAll(selector: string, off: boolean): void {
+  for (const el of document.querySelectorAll<HTMLInputElement>(selector)) el.disabled = off
+}
+
 function syncEnablement(): void {
   const split = checked('#opt-chargedSplit')
   disable('#opt-piercing', !split)
   disable('#opt-chainReaction', !split)
   disable('#opt-trailMotes', radio('trails') === 'off') // only relevant when trails are on
+  disableAll('input[name="wellAnchor"]', !checked('#opt-well')) // anchor only matters when the well is on
+  disableAll('input[name="flowAnchor"]', !checked('#opt-flow'))
   const custom = checked('#opt-customPalette')
   disable('#opt-customBg', !custom) // colour pickers only matter with the custom palette on
   disable('#opt-customFront', !custom)
