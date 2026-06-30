@@ -46,6 +46,8 @@ export const PULSE_RANGE = 300
 const PULSE_STRENGTH = 380 // inward velocity kick at the centre, px/s (linear falloff to 0 at the edge)
 const MOTE_CHARGE_TIME = 2.5 // charge seconds at the base radius — scaled by size below
 const MAX_MOTES = 80 // safety cap so a chain reaction can't explode the field unboundedly
+const TRIM_INTERVAL = 0.3 // s between population trims while the field is over the count target
+const TRIM_FRACTION = 0.25 // proportion of the count over target trimmed each tick (proportional ease)
 const WELL_K = 1.8 // gravity-well pull toward the arena centre, 1/s^2 (sandbox toggle)
 const MOTE_DRAG = 0.5 // friction: fraction of mote velocity shed per second (sandbox toggle)
 const CHARGED_REPEL_RANGE = 95 // reach of charged-mote mutual repulsion, px
@@ -492,19 +494,50 @@ function resolveCollisions(rng: Rng, bullets: Bullet[], asteroids: Asteroid[]): 
   }
 }
 
-// The post-movement mote passes, gated by config: charged repel, mote↔mote bounce,
-// charged-split, (dormant) bullet hits, then conduction.
+// The post-movement mote passes, gated by config: charged repel, charged-split, mote↔mote
+// bounce, (dormant) bullet hits, then conduction. Split runs *before* bounce: both use the
+// same outline contact, and if bounce ran first it would separate an overlapping pair so
+// the split could no longer see the contact — "it bounced but didn't split".
 function reactMotes(rng: Rng, motes: Asteroid[], bullets: Bullet[], config: Config, dt: number, width: number, height: number): { asteroids: Asteroid[], bullets: Bullet[], shatters: Vec2[] } {
   // Mote↔mote passes measure distance the toroidal way in wrap mode, so a pair straddling
   // an edge interacts across the seam instead of reading as a whole arena apart.
   const wrap = config.edges === 'wrap'
   const repelled = config.chargedRepel ? applyChargedRepel(motes, dt, width, height, wrap) : motes
   const bip = config.bipolar ? applyBipolar(repelled, dt, width, height, wrap) : repelled
-  const bounced = config.moteCollision ? resolveMoteBounce(bip, width, height, wrap) : bip
-  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, bounced, config, width, height) : { asteroids: bounced, shatters: [] }
-  const hit = resolveCollisions(rng, bullets, reacted.asteroids)
+  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, bip, config, width, height) : { asteroids: bip, shatters: [] }
+  const bounced = config.moteCollision ? resolveMoteBounce(reacted.asteroids, width, height, wrap) : reacted.asteroids
+  const hit = resolveCollisions(rng, bullets, bounced)
   const conducted = config.conduction ? applyConduction(hit.asteroids, width, height, wrap) : hit.asteroids
   return { asteroids: conducted, bullets: hit.bullets, shatters: reacted.shatters }
+}
+
+// Bring the field back toward the target after splits churn it. Splits raise the entity
+// count *and* lose mass (two children are smaller than the parent), so a plain count-floor
+// leaves a dwindling cloud of fragments that never returns to the chosen motes. Two forces
+// converge it to `moteCount` full-size motes:
+//  - refill by MASS: spawn full motes while the field is at least one full mote under
+//    moteCount full motes' worth of area — so destroyed fragments come back as big motes.
+//  - trim by COUNT: gently drop the smallest (fragment) motes when over the count target
+//    (a proportional cull, once per TRIM_INTERVAL), so the population can't ratchet up.
+// Time-gated off world.t (no Math.random) so it stays pure / deterministic.
+function populateField(rng: Rng, motes: Asteroid[], config: Config, width: number, height: number, avoid: Vec2, t: number, dt: number): Asteroid[] {
+  const fullArea = config.moteSize * config.moteSize
+  const target = config.moteCount * fullArea
+  let kept = motes
+  let area = kept.reduce((s, a) => s + a.radius * a.radius, 0)
+  // Trim on a tick when over the count, or under target mass with a fragment to convert (drop
+  // it so the refill replaces it with a full mote → all big at rest). Smallest dropped first.
+  const fragmentLight = area < target && kept.some((a) => a.radius < config.moteSize)
+  if (Math.floor(t / TRIM_INTERVAL) !== Math.floor((t + dt) / TRIM_INTERVAL) && (kept.length > config.moteCount || fragmentLight)) {
+    const cull = Math.max(1, Math.round(Math.max(0, kept.length - config.moteCount) * TRIM_FRACTION))
+    const drop = new Set([...kept.keys()].sort((a, b) => kept[a].radius - kept[b].radius).slice(0, cull))
+    kept = kept.filter((_, i) => !drop.has(i))
+    area = kept.reduce((s, a) => s + a.radius * a.radius, 0)
+  }
+  // Refill big motes by mass: as many full motes as fit under the target area (and MAX_MOTES).
+  const room = Math.max(0, Math.min(Math.floor((target - area) / fullArea), MAX_MOTES - kept.length))
+  const refill = [...Array(room).keys()].map(() => spawnAsteroid(rng, width, height, config.moteSize, config.moteDrift, avoid))
+  return [...kept, ...refill]
 }
 
 /** Advance the world one fixed timestep. Pure: returns a new world. `config` selects
@@ -526,18 +559,16 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
   const moved = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, config, world.pillars)).filter((a): a is Asteroid => a !== null)
   const reacted = reactMotes(rng, moved, bullets, config, dt, world.width, world.height)
 
-  // Keep the field populated to the configured count (no game-over yet: it's a sandbox).
-  const deficit = Math.max(0, config.moteCount - reacted.asteroids.length)
-  const refill = [...Array(deficit).keys()].map(() =>
-    spawnAsteroid(rng, world.width, world.height, config.moteSize, config.moteDrift, armed.pos),
-  )
+  // Keep the field populated toward the configured count, as full motes (no game-over yet:
+  // it's a sandbox). Trims fragment excess and refills big motes by mass — see populateField.
+  const asteroids = populateField(rng, reacted.asteroids, config, world.width, world.height, armed.pos, world.t, dt)
 
   return {
     width: world.width,
     height: world.height,
     ship: armed,
     bullets: reacted.bullets,
-    asteroids: [...reacted.asteroids, ...refill],
+    asteroids,
     pillars: world.pillars, // static: carried through unchanged
     shatters: reacted.shatters, // this step's shatter centres (debris source)
     rngState: rng.s,

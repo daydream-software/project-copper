@@ -283,6 +283,13 @@ describe('physics & charge modes', () => {
     expect(close.asteroids[0].vel.x).toBeLessThan(0) // reversed by the bounce
   })
 
+  it('a charged contact still splits when bounce is on (bounce must not separate it first)', () => {
+    // Overlapping charged + uncharged (40px apart, r48 each). With bounce on, if bounce ran
+    // first it would shove them apart and the split would miss — the split must run first.
+    const w = step(makeWorld({ asteroids: [moteAt(300, 300, 48, 2), moteAt(340, 300, 48, 0)] }), NONE, DT, cfg({ moteCollision: true }))
+    expect(w.asteroids.filter((a) => a.radius < 40).length).toBeGreaterThanOrEqual(4) // split fired despite bounce
+  })
+
   it('the flow field pushes a still mote', () => {
     const w = step(makeWorld({ asteroids: [moteAt(300, 300, 30, 0)] }), NONE, DT, cfg({ flow: true }))
     expect(Math.hypot(w.asteroids[0].vel.x, w.asteroids[0].vel.y)).toBeGreaterThan(0)
@@ -322,6 +329,20 @@ describe('mote field knobs', () => {
     const w = step(makeWorld({ asteroids: [] }), NONE, DT, cfg({ moteCount: 4, moteSize: 36 }))
     expect(w.asteroids).toHaveLength(4)
     expect(w.asteroids.every((a) => a.radius === 36)).toBe(true)
+  })
+
+  it('trims a too-full field back to the target count over time, as full motes', () => {
+    const many = [...Array(16).keys()].map((i) => moteAt(40 + i * 45, 300, 48, 0)) // 16 full motes, target 8
+    let w = makeWorld({ width: 800, height: 600, asteroids: many })
+    for (let i = 0; i < 1200; i += 1) w = step(w, NONE, DT, cfg({ moteCount: 8, moteSize: 48 }))
+    expect(w.asteroids).toHaveLength(8) // converged down to the target count
+    expect(w.asteroids.every((a) => a.radius === 48)).toBe(true) // still full motes
+  })
+
+  it('refills by mass: a field at the count but under-weight gets full motes added', () => {
+    const light = [...Array(8).keys()].map((i) => moteAt(60 + i * 80, 300, 24, 0)) // 8 small → under target mass
+    const w = step(makeWorld({ width: 800, height: 600, asteroids: light }), NONE, DT, cfg({ moteCount: 8, moteSize: 48 }))
+    expect(w.asteroids.some((a) => a.radius === 48)).toBe(true) // big motes added to restore the mass, though count is already 8
   })
 
   it('moteDrift=0 spawns motionless motes', () => {
