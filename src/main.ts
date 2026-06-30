@@ -22,7 +22,6 @@ const ctx = canvas.getContext('2d')
 if (ctx === null) throw new Error('2d context unavailable')
 
 const input = createInput(window)
-let world: World = createWorld(readSeed(), canvas.width, canvas.height)
 
 function checked(id: string): boolean {
   return document.querySelector<HTMLInputElement>(id)?.checked ?? false
@@ -30,6 +29,12 @@ function checked(id: string): boolean {
 
 function radio(name: string): string | undefined {
   return document.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)?.value
+}
+
+// A numeric control's value (range sliders), falling back if the control is missing.
+function num(id: string, fallback: number): number {
+  const v = document.querySelector<HTMLInputElement>(id)?.valueAsNumber
+  return v !== undefined && Number.isFinite(v) ? v : fallback
 }
 
 function readPanel(): Config {
@@ -50,6 +55,9 @@ function readPanel(): Config {
     bipolar: checked('#opt-bipolar'),
     burst: checked('#opt-burst'),
     stasis: checked('#opt-stasis'),
+    moteCount: num('#opt-moteCount', 6),
+    moteSize: num('#opt-moteSize', 48),
+    moteDrift: num('#opt-moteDrift', 60),
     well: checked('#opt-well'),
     friction: checked('#opt-friction'),
     moteCollision: checked('#opt-moteCollision'),
@@ -66,6 +74,17 @@ function readPanel(): Config {
 // would be shown but ignored. The loop reads this `let` each frame, so reassigning it
 // from the panel takes effect immediately.
 let config: Config = readPanel()
+
+// The world is seeded from the panel's count/size/drift; keep the seed so tuning those
+// knobs regenerates the *same* arena (motes resize / multiply in place, not reshuffle).
+let currentSeed = readSeed()
+let world: World = createWorld(currentSeed, canvas.width, canvas.height, config)
+
+// Mote count / size / drift are world-generation knobs: changing them rebuilds the field
+// (the toggles, by contrast, just take effect on the next step). Detect that here.
+function genChanged(a: Config, b: Config): boolean {
+  return a.moteCount !== b.moteCount || a.moteSize !== b.moteSize || a.moteDrift !== b.moteDrift
+}
 
 // Piercing / chain reaction only matter when charged motes split, so disable them
 // (the panel dims the nested group) when that's off.
@@ -121,10 +140,21 @@ syncEnablement()
 applyAudio()
 applyArenaShape()
 
+// Live-update each slider's value readout (the <output> next to it) as it moves.
+for (const r of document.querySelectorAll<HTMLInputElement>('#panel input[type="range"]')) {
+  const out = r.nextElementSibling
+  const sync = (): void => { if (out instanceof HTMLOutputElement) out.textContent = r.value }
+  r.addEventListener('input', sync)
+  sync()
+}
+
 const panel = document.querySelector<HTMLElement>('#panel')
 if (panel !== null) {
   panel.addEventListener('change', (e) => {
+    const prev = config
     config = readPanel()
+    // Regenerate the field (same seed → same arena) when a generation knob changed.
+    if (genChanged(prev, config)) world = createWorld(currentSeed, canvas.width, canvas.height, config)
     updateHint()
     syncEnablement()
     applyAudio()
@@ -133,7 +163,8 @@ if (panel !== null) {
     if (e.target instanceof HTMLElement) e.target.blur()
   })
   document.querySelector<HTMLButtonElement>('#opt-reseed')?.addEventListener('click', (e) => {
-    world = createWorld(Math.floor(Math.random() * 1_000_000_000), canvas.width, canvas.height)
+    currentSeed = Math.floor(Math.random() * 1_000_000_000)
+    world = createWorld(currentSeed, canvas.width, canvas.height, config)
     if (e.target instanceof HTMLElement) e.target.blur()
   })
 }

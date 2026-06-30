@@ -37,18 +37,28 @@ main {
   background: var(--bg);
 }
 
+/* Controls hint — pinned bottom-right so the (top-left) panel never covers it. */
 #hint {
+  position: fixed;
+  right: 1rem;
+  bottom: 0.85rem;
+  max-width: 23rem;
+  text-align: right;
   font-size: 0.8rem;
   letter-spacing: 0.04em;
   opacity: 0.6;
   user-select: none;
 }
 
-/* Sandbox options panel — floats over the canvas, top-left. */
+/* Sandbox options panel — floats over the canvas, top-left. It scrolls if it outgrows
+   the viewport so every control (Reseed, SFX…) stays reachable. */
 #panel {
   position: fixed;
   top: 1rem;
   left: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -92,6 +102,25 @@ main {
   align-items: center;
   gap: 0.4rem;
   cursor: pointer;
+}
+
+/* Slider rows (Motes: count / size / drift): label · slider (grows) · value readout. */
+#panel label.range {
+  gap: 0.55rem;
+  font-size: 0.76rem;
+}
+
+#panel label.range input[type="range"] {
+  flex: 1;
+  min-width: 72px;
+  height: 2px;
+}
+
+#panel label.range output {
+  min-width: 1.7rem;
+  text-align: right;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Nested sub-options (Piercing / Chain) hang off "Charged motes split" — a vertical

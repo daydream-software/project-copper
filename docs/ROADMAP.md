@@ -102,8 +102,23 @@ freezes charged motes in place (`stepMote` zeroes velocity while `charge > 0`) �
 charged mote becomes a fixed anchor. Each has a discriminating test (opposite poles
 attract / like repel, a bystander is shoved on shatter, a charged mote holds still).
 
+### Slice K — mote field knobs (done)
+
+The first numeric knobs (sliders, not toggles): a **Motes** panel group tunes the field
+itself — **Count** (1–24), **Size** (base radius 20–80) and **Drift** (0–160 px/s) — backed
+by `moteCount` / `moteSize` / `moteDrift` in `Config` (defaulting to the shipped 6 / 48 / 60,
+so `createWorld` / `step` are unchanged for existing callers and tests). `createWorld` and
+the field-refill in `step` read them; because radius/drift are spawn *params* (not RNG
+draws), tuning a knob and **regenerating on the same seed** resizes/multiplies the motes
+*in place* rather than reshuffling the arena. `main.ts` rebuilds the world (same
+`currentSeed`) only when a generation knob changes, and each slider shows a live `<output>`
+readout. UI fixes alongside: the controls **hint moved to the bottom-right** (the tall
+top-left panel was covering it) and the **panel now scrolls** (`max-height` + `overflow-y`)
+so Reseed/SFX stay reachable as it grows.
+
 ## Next — the open ladder (more mode packs)
 
+- **More knobs** — sliders for field range / strength / charge time / vortex bias.
 - **Arena extra** — static obstacles/pillars to bounce off.
 - **Pack: ship & juice** — ship collision (bounce, no game-over), dash, magnetic hull,
   debris particles on shatter (needs shatter positions from the sim).

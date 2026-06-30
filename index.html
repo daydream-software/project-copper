@@ -31,6 +31,12 @@
         <label><input type="radio" name="edges" value="kill" /> Kill</label>
         <label><input type="radio" name="edges" value="circle" /> Circle</label>
       </fieldset>
+      <fieldset>
+        <legend>Motes</legend>
+        <label class="range">Count <input type="range" id="opt-moteCount" min="1" max="24" step="1" value="6" /><output>6</output></label>
+        <label class="range">Size <input type="range" id="opt-moteSize" min="20" max="80" step="2" value="48" /><output>48</output></label>
+        <label class="range">Drift <input type="range" id="opt-moteDrift" min="0" max="160" step="10" value="60" /><output>60</output></label>
+      </fieldset>
       <label><input type="checkbox" id="opt-scatter" checked /> Scatter</label>
       <label><input type="checkbox" id="opt-vortex" checked /> Vortex</label>
       <label><input type="checkbox" id="opt-gun" /> Gun (press F)</label>

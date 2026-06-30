@@ -31,6 +31,12 @@ export interface Config {
   burst: boolean
   /** Charged motes freeze in place (stasis). */
   stasis: boolean
+  /** How many motes the field is kept topped up to. */
+  moteCount: number
+  /** Base radius of a freshly-spawned mote, px. */
+  moteSize: number
+  /** Max drift speed of a freshly-spawned mote, px/s. */
+  moteDrift: number
   /** Motes are pulled toward the arena centre (a gravity well). */
   well: boolean
   /** Motes lose speed over time (drag). */
@@ -63,6 +69,9 @@ export const DEFAULT_CONFIG: Config = {
   bipolar: false,
   burst: false,
   stasis: false,
+  moteCount: 6,
+  moteSize: 48,
+  moteDrift: 60,
   well: false,
   friction: false,
   moteCollision: false,

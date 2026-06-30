@@ -307,6 +307,33 @@ describe('advanced charge modes', () => {
   })
 })
 
+describe('mote field knobs', () => {
+  it('createWorld spawns config.moteCount motes at config.moteSize', () => {
+    const w = createWorld(7, 800, 600, cfg({ moteCount: 3, moteSize: 30 }))
+    expect(w.asteroids).toHaveLength(3)
+    expect(w.asteroids.every((a) => a.radius === 30)).toBe(true)
+  })
+
+  it('the field refills up to config.moteCount at config.moteSize', () => {
+    const w = step(makeWorld({ asteroids: [] }), NONE, DT, cfg({ moteCount: 4, moteSize: 36 }))
+    expect(w.asteroids).toHaveLength(4)
+    expect(w.asteroids.every((a) => a.radius === 36)).toBe(true)
+  })
+
+  it('moteDrift=0 spawns motionless motes', () => {
+    const w = createWorld(7, 800, 600, cfg({ moteDrift: 0 }))
+    expect(w.asteroids.every((a) => a.vel.x === 0 && a.vel.y === 0)).toBe(true)
+  })
+
+  it('same seed regenerates the same arena (positions/shapes preserved on resize)', () => {
+    const small = createWorld(7, 800, 600, cfg({ moteSize: 30 }))
+    const big = createWorld(7, 800, 600, cfg({ moteSize: 60 }))
+    expect(big.asteroids[0].pos).toEqual(small.asteroids[0].pos) // resized in place, not reshuffled
+    expect(big.asteroids[0].radius).toBe(60)
+    expect(small.asteroids[0].radius).toBe(30)
+  })
+})
+
 describe('edges mode', () => {
   const fastShip = { pos: { x: 799, y: 300 }, vel: { x: 300, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' as const, charge: 0, pulseT: 99 }
 

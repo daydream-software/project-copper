@@ -28,7 +28,6 @@ const ASTEROID_MAX_SPIN = 0.8 // max rad/s
 const ASTEROID_POINTS_MIN = 8
 const ASTEROID_POINTS_MAX = 12
 const CHILD_SCALE = 0.58 // child radius = parent radius * this
-const TARGET_ASTEROIDS = 6 // field is topped up to this count
 const SAFE_SPAWN_DIST = 140 // keep fresh asteroids off the ship
 const MOTE_MAX_SPEED = 720 // clamp so the field can't fling motes off to infinity (high enough for a charged fling)
 
@@ -88,10 +87,10 @@ function safePos(rng: Rng, width: number, height: number, avoid: Vec2): Vec2 {
   }
 }
 
-function spawnAsteroid(rng: Rng, width: number, height: number, radius: number, avoid: Vec2): Asteroid {
+function spawnAsteroid(rng: Rng, width: number, height: number, radius: number, drift: number, avoid: Vec2): Asteroid {
   return {
     pos: safePos(rng, width, height, avoid),
-    vel: driftVel(rng, ASTEROID_DRIFT),
+    vel: driftVel(rng, drift),
     radius,
     angle: random(rng) * Math.PI * 2,
     spin: (random(rng) * 2 - 1) * ASTEROID_MAX_SPIN,
@@ -116,8 +115,10 @@ function spawnChild(rng: Rng, parent: Asteroid, childCharge: number): Asteroid {
   }
 }
 
-/** Build a fresh world: ship centred, a seeded asteroid field, no bullets. */
-export function createWorld(seed: number, width: number, height: number): World {
+/** Build a fresh world: ship centred, a seeded asteroid field, no bullets. The field's
+ * count / size / drift come from the sandbox config (defaulting to the shipped values),
+ * so the same seed regenerates the same arena with whatever knobs are set. */
+export function createWorld(seed: number, width: number, height: number, config: Config = DEFAULT_CONFIG): World {
   const rng = makeRng(seed)
   const ship: Ship = {
     pos: { x: width / 2, y: height / 2 },
@@ -129,8 +130,8 @@ export function createWorld(seed: number, width: number, height: number): World 
     charge: 0,
     pulseT: 99,
   }
-  const asteroids = [...Array(TARGET_ASTEROIDS).keys()].map(() =>
-    spawnAsteroid(rng, width, height, ASTEROID_BASE_RADIUS, ship.pos),
+  const asteroids = [...Array(config.moteCount).keys()].map(() =>
+    spawnAsteroid(rng, width, height, config.moteSize, config.moteDrift, ship.pos),
   )
   return { width, height, ship, bullets: [], asteroids, rngState: rng.s, t: 0 }
 }
@@ -513,10 +514,10 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
   const moved = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, config)).filter((a): a is Asteroid => a !== null)
   const reacted = reactMotes(rng, moved, bullets, config, dt)
 
-  // Keep the field populated (no game-over yet: it's a sandbox).
-  const deficit = Math.max(0, TARGET_ASTEROIDS - reacted.asteroids.length)
+  // Keep the field populated to the configured count (no game-over yet: it's a sandbox).
+  const deficit = Math.max(0, config.moteCount - reacted.asteroids.length)
   const refill = [...Array(deficit).keys()].map(() =>
-    spawnAsteroid(rng, world.width, world.height, ASTEROID_BASE_RADIUS, armed.pos),
+    spawnAsteroid(rng, world.width, world.height, config.moteSize, config.moteDrift, armed.pos),
   )
 
   return {
