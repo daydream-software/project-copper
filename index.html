@@ -20,6 +20,10 @@
     <aside id="panel">
       <h2>Sandbox</h2>
       <fieldset>
+        <legend>Seed</legend>
+        <input type="text" id="opt-seed" spellcheck="false" autocomplete="off" aria-label="settings seed" />
+      </fieldset>
+      <fieldset>
         <legend>Gather</legend>
         <label><input type="radio" name="gather" value="pulse" checked /> Pulse</label>
         <label><input type="radio" name="gather" value="attract" /> Attract (hold)</label>
@@ -99,7 +103,7 @@
         <label><input type="radio" name="music" value="autorun" /> Autorun</label>
         <label><input type="checkbox" id="opt-sfx" checked /> Sound effects</label>
       </fieldset>
-      <button id="opt-reseed" type="button">⟳ Reseed</button>
+      <button id="opt-reseed" type="button">⟳ Shuffle motes</button>
     </aside>
     <script type="module" src="/src/main.ts"></script>
   </body>

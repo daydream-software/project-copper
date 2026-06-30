@@ -164,6 +164,19 @@ main {
   cursor: pointer;
 }
 
+/* Seed: a full-width code field — the settings packed into a shareable string. */
+#panel input#opt-seed {
+  width: 100%;
+  padding: 0.25rem 0.4rem;
+  font: inherit;
+  font-size: 0.72rem;
+  color: var(--copper);
+  background: color-mix(in srgb, var(--copper) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--copper-dim) 40%, transparent);
+  border-radius: 3px;
+  cursor: text;
+}
+
 #panel button {
   margin-top: 0.3rem;
   padding: 0.3rem 0.5rem;

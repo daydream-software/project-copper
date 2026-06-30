@@ -3,6 +3,7 @@
 
 import './style.css'
 import { createWorld, step } from './sim'
+import { decodeSeed, encodeSeed } from './seed'
 import type { Config } from './config'
 import { draw, type Ghost, type Shard, type TrailDot } from './render'
 import { createInput } from './input'
@@ -74,6 +75,44 @@ function readPanel(): Config {
     debris: checked('#opt-debris'),
     palette: palette === 'mono' || palette === 'neon' ? palette : 'copper',
   }
+}
+
+// The inverse of readPanel: push a Config onto the controls (used when a seed is loaded).
+// Sets values directly without firing change events, so the panel listener isn't re-entered.
+function writePanel(c: Config): void {
+  const setRadio = (name: string, value: string): void => {
+    const el = document.querySelector<HTMLInputElement>(`input[name="${name}"][value="${value}"]`)
+    if (el !== null) el.checked = true
+  }
+  const setCheck = (id: string, on: boolean): void => {
+    const el = document.querySelector<HTMLInputElement>(id)
+    if (el !== null) el.checked = on
+  }
+  const setRange = (id: string, v: number): void => {
+    const el = document.querySelector<HTMLInputElement>(id)
+    if (el === null) return
+    el.value = String(v)
+    if (el.nextElementSibling instanceof HTMLOutputElement) el.nextElementSibling.textContent = String(v)
+  }
+  setRadio('gather', c.gather)
+  setRadio('edges', c.edges)
+  setRadio('palette', c.palette)
+  setRadio('trails', c.trails)
+  const checks: Array<[string, boolean]> = [
+    ['#opt-scatter', c.scatter], ['#opt-vortex', c.vortex], ['#opt-gun', c.gun],
+    ['#opt-chargedSplit', c.chargedSplit], ['#opt-piercing', c.piercing], ['#opt-chainReaction', c.chainReaction],
+    ['#opt-conduction', c.conduction], ['#opt-chargedRepel', c.chargedRepel], ['#opt-bipolar', c.bipolar],
+    ['#opt-burst', c.burst], ['#opt-stasis', c.stasis], ['#opt-well', c.well], ['#opt-friction', c.friction],
+    ['#opt-moteCollision', c.moteCollision], ['#opt-flow', c.flow], ['#opt-trailMotes', c.trailMotes],
+    ['#opt-shake', c.shake], ['#opt-debris', c.debris],
+  ]
+  for (const [id, on] of checks) setCheck(id, on)
+  const ranges: Array<[string, number]> = [
+    ['#opt-fieldRange', c.fieldRange], ['#opt-fieldStrength', c.fieldStrength], ['#opt-chargeTime', c.chargeTime],
+    ['#opt-vortexSwirl', c.vortexSwirl], ['#opt-moteCount', c.moteCount], ['#opt-moteSize', c.moteSize],
+    ['#opt-moteDrift', c.moteDrift], ['#opt-pillarCount', c.pillarCount], ['#opt-pillarSize', c.pillarSize],
+  ]
+  for (const [id, v] of ranges) setRange(id, v)
 }
 
 // Initialise from the panel's actual control state (browsers restore checkbox/radio
@@ -167,19 +206,41 @@ for (const r of document.querySelectorAll<HTMLInputElement>('#panel input[type="
   sync()
 }
 
+// The seed field *is* the settings: it shows the current config encoded, and editing it
+// loads those settings. The mote layout (Reseed/Shuffle) is separate and not in the seed.
+const seedInput = document.querySelector<HTMLInputElement>('#opt-seed')
+function refreshSeed(): void {
+  if (seedInput !== null) seedInput.value = encodeSeed(config)
+}
+refreshSeed()
+
 const panel = document.querySelector<HTMLElement>('#panel')
 if (panel !== null) {
   panel.addEventListener('change', (e) => {
+    if (e.target === seedInput) return // the seed field has its own handler below
     const prev = config
     config = readPanel()
     // Regenerate the field (same seed → same arena) when a generation knob changed.
     if (genChanged(prev, config)) world = createWorld(currentSeed, canvas.width, canvas.height, config)
+    refreshSeed() // settings changed → reflect them in the seed
     updateHint()
     syncEnablement()
     applyAudio()
     applyArenaShape()
     // Blur the control so the next space/shift goes to the game, not the checkbox.
     if (e.target instanceof HTMLElement) e.target.blur()
+  })
+  seedInput?.addEventListener('change', () => {
+    const decoded = decodeSeed(seedInput.value)
+    if (decoded === null) { refreshSeed(); return } // unreadable → restore the current seed
+    writePanel(decoded)
+    config = readPanel()
+    world = createWorld(currentSeed, canvas.width, canvas.height, config)
+    refreshSeed() // normalise the field to the applied settings
+    updateHint()
+    syncEnablement()
+    applyArenaShape()
+    seedInput.blur()
   })
   document.querySelector<HTMLButtonElement>('#opt-reseed')?.addEventListener('click', (e) => {
     currentSeed = Math.floor(Math.random() * 1_000_000_000)
