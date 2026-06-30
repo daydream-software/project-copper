@@ -50,7 +50,23 @@ bounded by `MAX_MOTES`); plus **reseed**. The on-screen hint tracks the config. 
 duration scales with mote radius (`chargeTimeFor`). Every toggle has a discriminating
 unit test.
 
-## Next — the open ladder (not built yet)
+### Slice M1 — mode pack: charge & physics (done)
+
+Four sandbox toggles: **conduction** (a charged hit *spreads* charge to the touched
+mote instead of shattering — overrides split; `resolveMoteCollisions`), **charged
+repel** (charged motes push each other apart; `applyChargedRepel`), **gravity well**
+(motes pulled to the arena centre) and **friction** (mote drag) — both in `stepMote`
+(field force extracted to `fieldForce`). Each has a discriminating test.
+
+## Next — the open ladder (more mode packs)
+
+- **Pack: more charge** — bipolar +/- charge, overcharge→burst, stasis.
+- **Pack: physics** — mote↔mote elastic collisions, flow field.
+- **Pack: arena** — circular arena, obstacles/walls, kill-edges.
+- **Pack: ship & juice** — ship collision (bounce, no game-over), dash, magnetic hull,
+  trails, debris on shatter, screen-shake, palette themes.
+
+### Older notes
 
 5. **Numeric knobs.** Sliders for field range / strength / vortex bias / charge time /
    mote count, on top of the toggle panel.

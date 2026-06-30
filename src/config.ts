@@ -20,6 +20,14 @@ export interface Config {
   piercing: boolean
   /** Split fragments are born charged, so a hit can cascade. */
   chainReaction: boolean
+  /** Charge spreads to touched motes instead of shattering them (overrides split). */
+  conduction: boolean
+  /** Charged motes push each other apart. */
+  chargedRepel: boolean
+  /** Motes are pulled toward the arena centre (a gravity well). */
+  well: boolean
+  /** Motes lose speed over time (drag). */
+  friction: boolean
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -31,4 +39,8 @@ export const DEFAULT_CONFIG: Config = {
   chargedSplit: true,
   piercing: false,
   chainReaction: false,
+  conduction: false,
+  chargedRepel: false,
+  well: false,
+  friction: false,
 }

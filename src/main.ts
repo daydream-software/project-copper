@@ -44,6 +44,10 @@ function readPanel(): Config {
     chargedSplit: checked('#opt-chargedSplit'),
     piercing: checked('#opt-piercing'),
     chainReaction: checked('#opt-chainReaction'),
+    conduction: checked('#opt-conduction'),
+    chargedRepel: checked('#opt-chargedRepel'),
+    well: checked('#opt-well'),
+    friction: checked('#opt-friction'),
   }
 }
 

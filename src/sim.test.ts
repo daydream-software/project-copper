@@ -238,6 +238,35 @@ describe('sandbox config', () => {
   })
 })
 
+describe('physics & charge modes', () => {
+  const contact = () => [moteAt(300, 300, 48, 2), moteAt(300, 300, 48, 0)]
+
+  it('conduction spreads charge to a touched mote instead of shattering it', () => {
+    const w = step(makeWorld({ asteroids: contact() }), NONE, DT, cfg({ conduction: true }))
+    expect(w.asteroids.filter((a) => a.radius < 40)).toHaveLength(0) // nothing shattered
+    expect(w.asteroids[0].charge).toBeGreaterThan(0)
+    expect(w.asteroids[1].charge).toBeGreaterThan(0) // the formerly-uncharged mote is now charged
+  })
+
+  it('charged motes repel each other', () => {
+    const w = step(makeWorld({ asteroids: [moteAt(300, 300, 30, 2), moteAt(340, 300, 30, 2)] }), NONE, DT, cfg({ chargedRepel: true }))
+    expect(w.asteroids[0].vel.x).toBeLessThan(0) // left mote shoved left
+    expect(w.asteroids[1].vel.x).toBeGreaterThan(0) // right mote shoved right
+  })
+
+  it('gravity well pulls a mote toward the centre', () => {
+    const w = step(makeWorld({ width: 800, height: 600, asteroids: [moteAt(200, 300, 30, 0)] }), NONE, DT, cfg({ well: true }))
+    expect(w.asteroids[0].vel.x).toBeGreaterThan(0) // centre is at x=400 → pulled right
+  })
+
+  it('friction bleeds a mote speed', () => {
+    const fast = { pos: { x: 300, y: 300 }, vel: { x: 200, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 0 }
+    const w = step(makeWorld({ asteroids: [fast] }), NONE, DT, cfg({ friction: true }))
+    expect(w.asteroids[0].vel.x).toBeGreaterThan(0)
+    expect(w.asteroids[0].vel.x).toBeLessThan(200)
+  })
+})
+
 describe('edges mode', () => {
   const fastShip = { pos: { x: 799, y: 300 }, vel: { x: 300, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' as const, charge: 0, pulseT: 99 }
 
