@@ -315,6 +315,17 @@ describe('physics & charge modes', () => {
     expect(w.asteroids[1].vel.x).toBeGreaterThan(0)
   })
 
+  it('mote bounce follows the outline, not the bounding circle', () => {
+    const blob = ring(0.7) // outline at 0.7 of the radius (reach 21 for r=30; sum 42)
+    const bm = (x: number, vx: number) => ({ pos: { x, y: 300 }, vel: { x: vx, y: 0 }, radius: 30, angle: 0, spin: 0, shape: blob, charge: 0 })
+    // Centres 50 apart: bounding circles (sum 60) overlap, outlines (sum 42) don't → no bounce.
+    const apart = step(makeWorld({ asteroids: [bm(300, 100), bm(350, -100)] }), NONE, DT, cfg({ moteCollision: true }))
+    expect(apart.asteroids[0].vel.x).toBeGreaterThan(0) // still heading right, unbounced
+    // Centres 40 apart: outlines (sum 42) overlap → they bounce apart.
+    const close = step(makeWorld({ asteroids: [bm(300, 100), bm(340, -100)] }), NONE, DT, cfg({ moteCollision: true }))
+    expect(close.asteroids[0].vel.x).toBeLessThan(0) // reversed by the bounce
+  })
+
   it('the flow field pushes a still mote', () => {
     const w = step(makeWorld({ asteroids: [moteAt(300, 300, 30, 0)] }), NONE, DT, cfg({ flow: true }))
     expect(Math.hypot(w.asteroids[0].vel.x, w.asteroids[0].vel.y)).toBeGreaterThan(0)
@@ -459,6 +470,18 @@ describe('pillars', () => {
     const ship = { pos: { x: 450, y: 300 }, vel: { x: -120, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' as const, charge: 0, pulseT: 99 }
     const w = step(makeWorld({ ship, pillars: [pillar] }), NONE, DT)
     expect(w.ship.vel.x).toBeGreaterThan(0) // reflected away from the pillar
+  })
+
+  it('a mote bounces off a pillar by its outline, not its bounding circle', () => {
+    const blob = ring(0.7) // reach 21 toward the pillar (sum with the r=40 pillar = 61)
+    const pm = (x: number) => ({ pos: { x, y: 300 }, vel: { x: -100, y: 0 }, radius: 30, angle: 0, spin: 0, shape: blob, charge: 0 })
+    const pillar = { pos: { x: 400, y: 300 }, radius: 40 }
+    // Centre 65 from the pillar: the bounding circle (sum 70) would contact, the outline (61) doesn't.
+    const apart = step(makeWorld({ asteroids: [pm(465)], pillars: [pillar] }), NONE, DT)
+    expect(apart.asteroids[0].vel.x).toBeLessThan(0) // not bounced — still heading in
+    // Centre 55: the outline (61) contacts → bounces back out.
+    const close = step(makeWorld({ asteroids: [pm(455)], pillars: [pillar] }), NONE, DT)
+    expect(close.asteroids[0].vel.x).toBeGreaterThan(0) // reflected away
   })
 })
 

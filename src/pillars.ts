@@ -3,7 +3,7 @@
 // like the rest of the simulation — randomness only through the seeded rng.
 
 import { random, type Rng } from './rng'
-import { deflect } from './geometry'
+import { deflect, outlineRadius, type Vec2 } from './geometry'
 import type { Pillar } from './entities'
 
 const PILLAR_SHIP_CLEAR = 30 // extra gap so a pillar never spawns on the centred ship, px
@@ -32,8 +32,13 @@ export function spawnPillars(rng: Rng, width: number, height: number, count: num
   return pillars
 }
 
-// Bounce a moving circle off every pillar in turn (pillars don't overlap, so folding the
-// deflections sequentially resolves cleanly).
-export function bouncePillars(x: number, y: number, vx: number, vy: number, r: number, pillars: Pillar[]): { x: number, y: number, vx: number, vy: number } {
-  return pillars.reduce((s, p) => deflect(s.x, s.y, s.vx, s.vy, r, p.pos.x, p.pos.y, p.radius), { x, y, vx, vy })
+// Bounce a moving body off every pillar in turn (pillars don't overlap, so folding the
+// deflections sequentially resolves cleanly). The body's reach toward each pillar follows
+// its `shape` outline (interpolated, like mote↔mote contact); a circle body passes an empty
+// shape, for which outlineRadius falls back to `radius` (the ship does this).
+export function bouncePillars(x: number, y: number, vx: number, vy: number, radius: number, shape: Vec2[], angle: number, pillars: Pillar[]): { x: number, y: number, vx: number, vy: number } {
+  return pillars.reduce((s, p) => {
+    const r = outlineRadius(shape, radius, angle, p.pos.x - s.x, p.pos.y - s.y) // reach toward the pillar
+    return deflect(s.x, s.y, s.vx, s.vy, r, p.pos.x, p.pos.y, p.radius)
+  }, { x, y, vx, vy })
 }

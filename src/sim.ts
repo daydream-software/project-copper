@@ -3,7 +3,7 @@
 // (rng.ts) for all randomness, so a run is reproducible and directly unit-testable.
 
 import { makeRng, random, range, type Rng } from './rng'
-import { bound, makeShape, outlinesTouch, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
+import { bound, makeShape, outlineRadius, outlinesTouch, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import { bouncePillars, spawnPillars } from './pillars'
 import type { Asteroid, Bullet, FieldMode, Input, Pillar, Ship, World } from './entities'
@@ -163,7 +163,7 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
   // The ship never dies at the edge (no game-over) — kill behaves like bounce for it.
   const shipMode = config.edges === 'kill' ? 'bounce' : config.edges
   const b = bound(ship.pos.x + vx * dt, ship.pos.y + vy * dt, vx, vy, SHIP_RADIUS, width, height, shipMode)
-  const p = bouncePillars(b.x, b.y, b.vx, b.vy, SHIP_RADIUS, pillars)
+  const p = bouncePillars(b.x, b.y, b.vx, b.vy, SHIP_RADIUS, [], 0, pillars) // ship is a circle
   return {
     pos: { x: p.x, y: p.y },
     vel: { x: p.vx, y: p.vy },
@@ -262,7 +262,7 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
   }
   const b = bound(a.pos.x + vx * dt, a.pos.y + vy * dt, vx, vy, a.radius, width, height, config.edges)
   if (b.dead) return null // killed at the edge (kill mode)
-  const p = bouncePillars(b.x, b.y, b.vx, b.vy, a.radius, pillars)
+  const p = bouncePillars(b.x, b.y, b.vx, b.vy, a.radius, a.shape, a.angle, pillars) // mote bounces by its outline
   return {
     ...a,
     vel: { x: p.vx, y: p.vy },
@@ -331,12 +331,15 @@ function resolveMoteBounce(motes: Asteroid[]): Asteroid[] {
     for (let j = i + 1; j < motes.length; j += 1) {
       const dx = px[j] - px[i]
       const dy = py[j] - py[i]
-      const rsum = motes[i].radius + motes[j].radius
       const d2 = dx * dx + dy * dy
-      if (d2 <= 0 || d2 >= rsum * rsum) continue
+      if (d2 <= 0) continue // coincident — no contact normal; leave to next frame
       const d = Math.sqrt(d2)
       const nx = dx / d
       const ny = dy / d
+      // Contact follows each mote's outline toward the other, not the bounding circle.
+      const rsum = outlineRadius(motes[i].shape, motes[i].radius, motes[i].angle, nx, ny)
+        + outlineRadius(motes[j].shape, motes[j].radius, motes[j].angle, -nx, -ny)
+      if (d >= rsum) continue
       const ma = motes[i].radius * motes[i].radius
       const mb = motes[j].radius * motes[j].radius
       const mt = ma + mb
