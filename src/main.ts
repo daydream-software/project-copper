@@ -34,6 +34,7 @@ function radio(name: string): string | undefined {
 
 function readPanel(): Config {
   const palette = radio('palette')
+  const trails = radio('trails')
   return {
     gather: radio('gather') === 'attract' ? 'attract' : 'pulse',
     edges: radio('edges') === 'bounce' ? 'bounce' : 'wrap',
@@ -47,7 +48,7 @@ function readPanel(): Config {
     chargedRepel: checked('#opt-chargedRepel'),
     well: checked('#opt-well'),
     friction: checked('#opt-friction'),
-    trails: checked('#opt-trails'),
+    trails: trails === 'dust' || trails === 'full' ? trails : 'off',
     shake: checked('#opt-shake'),
     palette: palette === 'mono' || palette === 'neon' ? palette : 'copper',
   }

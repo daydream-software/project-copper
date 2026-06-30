@@ -6,23 +6,29 @@ import { FIELD_RANGE, PULSE_RANGE } from './sim'
 import type { Config } from './config'
 import type { FieldMode, World } from './entities'
 
-interface Palette { bg: string, stroke: string, dim: string, charged: string, trail: string }
+interface Palette { bg: string, rgb: string, stroke: string, dim: string, charged: string }
 
 const PALETTES: Record<Config['palette'], Palette> = {
-  copper: { bg: '#0a0a0a', stroke: '#d98a44', dim: '#b87333', charged: '#f6c98a', trail: 'rgba(10, 10, 10, 0.2)' },
-  mono: { bg: '#0a0a0a', stroke: '#d6d6d6', dim: '#8a8a8a', charged: '#ffffff', trail: 'rgba(10, 10, 10, 0.2)' },
-  neon: { bg: '#05060d', stroke: '#36e3ff', dim: '#2487a3', charged: '#b6f5ff', trail: 'rgba(5, 6, 13, 0.2)' },
+  copper: { bg: '#0a0a0a', rgb: '10, 10, 10', stroke: '#d98a44', dim: '#b87333', charged: '#f6c98a' },
+  mono: { bg: '#0a0a0a', rgb: '10, 10, 10', stroke: '#d6d6d6', dim: '#8a8a8a', charged: '#ffffff' },
+  neon: { bg: '#05060d', rgb: '5, 6, 13', stroke: '#36e3ff', dim: '#2487a3', charged: '#b6f5ff' },
 }
+
+// Per-frame fade alpha for trails, over the palette's exact background colour so the
+// tail returns to bg. `dust` clears fast (a faint haze); `full` lingers (long streaks).
+const TRAIL_ALPHA: Record<'dust' | 'full', number> = { dust: 0.55, full: 0.16 }
 
 const PULSE_FLASH = 0.35 // seconds the gather-pulse ripple stays visible
 
-// The active palette for this frame — set at the top of draw(), read by the helpers.
+// Per-frame view state — set at the top of draw(), read by the helpers.
 let active: Palette = PALETTES.copper
+let glow = true // charged-mote glow; off under trails so the halo doesn't accumulate into haze
 
 export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config): void {
   active = PALETTES[config.palette]
-  // Trails: fade the previous frame instead of clearing it.
-  ctx.fillStyle = config.trails ? active.trail : active.bg
+  glow = config.trails === 'off'
+  // Trails: fade the previous frame (toward the palette bg) instead of clearing it.
+  ctx.fillStyle = config.trails === 'off' ? active.bg : `rgba(${active.rgb}, ${TRAIL_ALPHA[config.trails]})`
   ctx.fillRect(0, 0, world.width, world.height)
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
@@ -100,8 +106,8 @@ function drawAsteroids(ctx: CanvasRenderingContext2D, world: World): void {
     const charged = a.charge > 0
     ctx.strokeStyle = charged ? active.charged : active.stroke
     ctx.lineWidth = charged ? 3 : 2
-    ctx.shadowBlur = charged ? 10 : 0
-    ctx.shadowColor = charged ? active.charged : 'transparent'
+    ctx.shadowBlur = charged && glow ? 10 : 0
+    ctx.shadowColor = charged && glow ? active.charged : 'transparent'
     ctx.save()
     ctx.translate(a.pos.x, a.pos.y)
     ctx.rotate(a.angle)
