@@ -8,7 +8,7 @@ import type { Config } from './config'
 import { draw, paletteFor, type Ghost, type Shard, type TrailDot } from './render'
 import { createInput } from './input'
 import { createLoop } from './loop'
-import { resumeAudio, setMusic, setSfx, sfxPulse, sfxShatter } from './audio'
+import { resumeAudio, setMusic, setMusicVolume, setSfxVolume, sfxPulse, sfxShatter } from './audio'
 import type { World } from './entities'
 
 function readSeed(): number {
@@ -162,11 +162,13 @@ function syncEnablement(): void {
   disable('#opt-customFront', !custom)
 }
 
-// Read the music/SFX controls (separate from the sim Config — audio is output only).
+// Read the music/SFX controls (separate from the sim Config — audio is output only, so it's
+// not in the seed). Track + two volume sliders.
 function applyAudio(): void {
   const m = document.querySelector<HTMLInputElement>('input[name="music"]:checked')?.value
   setMusic(m === 'between' || m === 'autorun' ? m : 'off')
-  setSfx(checked('#opt-sfx'))
+  setMusicVolume(num('#opt-musicVol', 0.5))
+  setSfxVolume(num('#opt-sfxVol', 0.8))
 }
 
 // Theme the DOM UI to the active palette: push the canvas palette's colours onto the CSS
@@ -231,6 +233,11 @@ for (const r of document.querySelectorAll<HTMLInputElement>('#panel input[type="
   const sync = (): void => { if (out instanceof HTMLOutputElement) out.textContent = r.value }
   r.addEventListener('input', sync)
   sync()
+}
+
+// Volume sliders take effect live as they move (audio is output-only — not in readPanel/seed).
+for (const v of document.querySelectorAll<HTMLInputElement>('#opt-musicVol, #opt-sfxVol')) {
+  v.addEventListener('input', applyAudio)
 }
 
 // The seed field *is* the settings: it shows the current config encoded, and editing it

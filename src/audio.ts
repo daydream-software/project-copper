@@ -11,14 +11,21 @@ const URLS: Record<'autorun' | 'between', string> = { between: betweenUrl, autor
 
 let music: HTMLAudioElement | null = null
 let loaded: MusicTrack = 'off'
+let musicVolume = 0.5
 
 function musicEl(): HTMLAudioElement {
   if (music === null) {
     music = new Audio()
     music.loop = true
-    music.volume = 0.5
   }
+  music.volume = musicVolume
   return music
+}
+
+/** Music loudness, 0–1. Applies live to the playing track. */
+export function setMusicVolume(v: number): void {
+  musicVolume = v
+  if (music !== null) music.volume = v
 }
 
 /** Pick the music track (or 'off'). Starts on a user gesture; ignores autoplay blocks. */
@@ -37,12 +44,16 @@ export function setMusic(track: MusicTrack): void {
   })
 }
 
-// --- SFX: a lazily-created WebAudio context + a couple of one-shot synth sounds ---
+// --- SFX: a lazily-created WebAudio context + a couple of one-shot synth sounds, all
+// routed through a master gain so one volume controls them (0 = muted) ---
 let ctx: AudioContext | null = null
-let sfxOn = true
+let sfxGain: GainNode | null = null
+let sfxVolume = 0.8
 
-export function setSfx(on: boolean): void {
-  sfxOn = on
+/** SFX loudness, 0–1 (0 mutes them). Applies live. */
+export function setSfxVolume(v: number): void {
+  sfxVolume = v
+  if (sfxGain !== null) sfxGain.gain.value = v
 }
 
 /** Resume audio on the first user gesture (browsers start the context suspended). */
@@ -51,16 +62,23 @@ export function resumeAudio(): void {
   if (ctx.state === 'suspended') void ctx.resume()
 }
 
-function sfxCtx(): AudioContext | null {
-  if (!sfxOn) return null
+// The SFX context + the master gain node everything connects to — or null when muted.
+function sfxOut(): { c: AudioContext, out: AudioNode } | null {
+  if (sfxVolume <= 0) return null
   ctx ??= new AudioContext()
-  return ctx
+  if (sfxGain === null) {
+    sfxGain = ctx.createGain()
+    sfxGain.gain.value = sfxVolume
+    sfxGain.connect(ctx.destination)
+  }
+  return { c: ctx, out: sfxGain }
 }
 
 /** Gather pulse: a soft downward blip (a tug inward). */
 export function sfxPulse(): void {
-  const c = sfxCtx()
-  if (c === null) return
+  const s = sfxOut()
+  if (s === null) return
+  const { c, out } = s
   const t = c.currentTime
   const osc = c.createOscillator()
   const gain = c.createGain()
@@ -70,15 +88,16 @@ export function sfxPulse(): void {
   gain.gain.setValueAtTime(0.16, t)
   gain.gain.exponentialRampToValueAtTime(0.0008, t + 0.19)
   osc.connect(gain)
-  gain.connect(c.destination)
+  gain.connect(out)
   osc.start(t)
   osc.stop(t + 0.2)
 }
 
 /** Shatter: a short filtered noise crack. */
 export function sfxShatter(): void {
-  const c = sfxCtx()
-  if (c === null) return
+  const s = sfxOut()
+  if (s === null) return
+  const { c, out } = s
   const t = c.currentTime
   const len = Math.floor(c.sampleRate * 0.18)
   const buf = c.createBuffer(1, len, c.sampleRate)
@@ -95,6 +114,6 @@ export function sfxShatter(): void {
   gain.gain.value = 0.22
   src.connect(hp)
   hp.connect(gain)
-  gain.connect(c.destination)
+  gain.connect(out)
   src.start(t)
 }

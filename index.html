@@ -106,7 +106,8 @@
         <label><input type="radio" name="music" value="off" checked /> Music off</label>
         <label><input type="radio" name="music" value="between" /> Between Runs</label>
         <label><input type="radio" name="music" value="autorun" /> Autorun</label>
-        <label><input type="checkbox" id="opt-sfx" checked /> Sound effects</label>
+        <label class="range">Music vol <input type="range" id="opt-musicVol" min="0" max="1" step="0.05" value="0.5" /><output>0.5</output></label>
+        <label class="range">SFX vol <input type="range" id="opt-sfxVol" min="0" max="1" step="0.05" value="0.8" /><output>0.8</output></label>
       </fieldset>
       <button id="opt-reseed" type="button">⟳ Shuffle motes</button>
     </aside>
