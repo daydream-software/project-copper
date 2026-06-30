@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { decodeSeed, encodeSeed } from './seed'
+import { SCHEMA, decodeSeed, encodeSeed } from './seed'
 import { DEFAULT_CONFIG, type Config } from './config'
 import { cfg } from './test-helpers'
 
@@ -31,6 +32,18 @@ describe('settings seed', () => {
     expect(decodeSeed('9abcdef')).toBeNull() // wrong version char
     expect(decodeSeed('1 not base36 !')).toBeNull()
     expect(decodeSeed('')).toBeNull()
+  })
+
+  it('the num-field schema matches the slider ranges in index.html (no drift)', () => {
+    const html = readFileSync('index.html', 'utf8')
+    for (const field of SCHEMA) {
+      if (field.kind !== 'num') continue
+      const tag = new RegExp(`id="opt-${field.key}"[^>]*`, 'u').exec(html)?.[0] ?? ''
+      const attr = (name: string): number => Number(new RegExp(`${name}="([\\d.]+)"`, 'u').exec(tag)?.[1])
+      expect(field.min, `${field.key} min`).toBe(attr('min'))
+      expect(field.step, `${field.key} step`).toBe(attr('step'))
+      expect(field.count, `${field.key} count`).toBe(Math.round((attr('max') - attr('min')) / attr('step')) + 1)
+    }
   })
 
   it('decodes any base36 body to an in-range config (self-bounding)', () => {

@@ -10,14 +10,15 @@ import { DEFAULT_CONFIG, type Config } from './config'
 
 const SEED_VERSION = '1'
 
-type Field =
+export type Field =
   | { key: keyof Config, kind: 'bool' }
   | { key: keyof Config, kind: 'enum', options: readonly string[] }
   | { key: keyof Config, kind: 'num', min: number, step: number, count: number }
 
 // Fixed order — encode and decode both walk it; appending a field needs a version bump.
-// `count` is the number of distinct slider values: (max − min) / step + 1.
-const SCHEMA: readonly Field[] = [
+// `count` is the number of distinct slider values: (max − min) / step + 1. Exported so a
+// test can assert these match the actual slider ranges in index.html (they must not drift).
+export const SCHEMA: readonly Field[] = [
   { key: 'gather', kind: 'enum', options: ['pulse', 'attract'] },
   { key: 'edges', kind: 'enum', options: ['wrap', 'bounce', 'kill', 'circle'] },
   { key: 'scatter', kind: 'bool' },

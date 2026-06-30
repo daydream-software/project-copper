@@ -233,9 +233,12 @@ if (panel !== null) {
   seedInput?.addEventListener('change', () => {
     const decoded = decodeSeed(seedInput.value)
     if (decoded === null) { refreshSeed(); return } // unreadable → restore the current seed
+    const prev = config
     writePanel(decoded)
     config = readPanel()
-    world = createWorld(currentSeed, canvas.width, canvas.height, config)
+    // Rebuild the field only if a generation knob changed — a toggle-only seed keeps the
+    // live arena (same currentSeed) instead of snapping motes back to their start.
+    if (genChanged(prev, config)) world = createWorld(currentSeed, canvas.width, canvas.height, config)
     refreshSeed() // normalise the field to the applied settings
     updateHint()
     syncEnablement()
