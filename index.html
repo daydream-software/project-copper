@@ -32,6 +32,16 @@
         <label><input type="radio" name="edges" value="circle" /> Circle</label>
       </fieldset>
       <fieldset>
+        <legend>Field</legend>
+        <label><input type="checkbox" id="opt-scatter" checked /> Scatter (shift)</label>
+        <label><input type="checkbox" id="opt-vortex" checked /> Vortex (space + shift)</label>
+        <label><input type="checkbox" id="opt-gun" /> Gun (press F)</label>
+        <label class="range">Range <input type="range" id="opt-fieldRange" min="120" max="420" step="10" value="260" /><output>260</output></label>
+        <label class="range">Strength <input type="range" id="opt-fieldStrength" min="200" max="2400" step="50" value="1100" /><output>1100</output></label>
+        <label class="range">Charge <input type="range" id="opt-chargeTime" min="0.3" max="4" step="0.1" value="1.4" /><output>1.4</output></label>
+        <label class="range">Swirl <input type="range" id="opt-vortexSwirl" min="200" max="1100" step="20" value="640" /><output>640</output></label>
+      </fieldset>
+      <fieldset>
         <legend>Motes</legend>
         <label class="range">Count <input type="range" id="opt-moteCount" min="1" max="24" step="1" value="6" /><output>6</output></label>
         <label class="range">Size <input type="range" id="opt-moteSize" min="20" max="80" step="2" value="48" /><output>48</output></label>
@@ -43,27 +53,20 @@
         <label class="range">Size <input type="range" id="opt-pillarSize" min="24" max="80" step="2" value="40" /><output>40</output></label>
       </fieldset>
       <fieldset>
-        <legend>Field</legend>
-        <label class="range">Range <input type="range" id="opt-fieldRange" min="120" max="420" step="10" value="260" /><output>260</output></label>
-        <label class="range">Strength <input type="range" id="opt-fieldStrength" min="200" max="2400" step="50" value="1100" /><output>1100</output></label>
-        <label class="range">Charge <input type="range" id="opt-chargeTime" min="0.3" max="4" step="0.1" value="1.4" /><output>1.4</output></label>
-        <label class="range">Swirl <input type="range" id="opt-vortexSwirl" min="200" max="1100" step="20" value="640" /><output>640</output></label>
+        <legend>Charge</legend>
+        <label><input type="checkbox" id="opt-chargedSplit" checked /> Charged motes split</label>
+        <div class="sub">
+          <label><input type="checkbox" id="opt-piercing" /> Piercing (charge persists)</label>
+          <label><input type="checkbox" id="opt-chainReaction" /> Chain reaction</label>
+        </div>
+        <label><input type="checkbox" id="opt-conduction" /> Conduction (charge spreads)</label>
+        <label><input type="checkbox" id="opt-chargedRepel" /> Charged repel</label>
+        <label><input type="checkbox" id="opt-bipolar" /> Bipolar (+/− poles)</label>
+        <label><input type="checkbox" id="opt-burst" /> Burst (shatter shockwave)</label>
+        <label><input type="checkbox" id="opt-stasis" /> Stasis (charge freezes)</label>
       </fieldset>
-      <label><input type="checkbox" id="opt-scatter" checked /> Scatter</label>
-      <label><input type="checkbox" id="opt-vortex" checked /> Vortex</label>
-      <label><input type="checkbox" id="opt-gun" /> Gun (press F)</label>
-      <label><input type="checkbox" id="opt-chargedSplit" checked /> Charged motes split</label>
-      <div class="sub">
-        <label><input type="checkbox" id="opt-piercing" /> Piercing (charge persists)</label>
-        <label><input type="checkbox" id="opt-chainReaction" /> Chain reaction</label>
-      </div>
-      <label><input type="checkbox" id="opt-conduction" /> Conduction (charge spreads)</label>
-      <label><input type="checkbox" id="opt-bipolar" /> Bipolar (+/− poles)</label>
-      <label><input type="checkbox" id="opt-burst" /> Burst (shatter shockwave)</label>
-      <label><input type="checkbox" id="opt-stasis" /> Stasis (charge freezes)</label>
       <fieldset>
         <legend>Physics</legend>
-        <label><input type="checkbox" id="opt-chargedRepel" /> Charged repel</label>
         <label><input type="checkbox" id="opt-well" /> Gravity well</label>
         <label><input type="checkbox" id="opt-friction" /> Friction</label>
         <label><input type="checkbox" id="opt-moteCollision" /> Mote collisions</label>
@@ -80,19 +83,22 @@
         <label><input type="radio" name="trails" value="off" checked /> Off</label>
         <label><input type="radio" name="trails" value="dust" /> Dust</label>
         <label><input type="radio" name="trails" value="full" /> Full</label>
+        <div class="sub">
+          <label><input type="checkbox" id="opt-trailMotes" checked /> Trail motes</label>
+        </div>
       </fieldset>
-      <div class="sub">
-        <label><input type="checkbox" id="opt-trailMotes" checked /> Trail motes</label>
-      </div>
-      <label><input type="checkbox" id="opt-shake" /> Screen shake</label>
-      <label><input type="checkbox" id="opt-debris" /> Debris (shatter shards)</label>
       <fieldset>
-        <legend>Music</legend>
-        <label><input type="radio" name="music" value="off" checked /> Off</label>
+        <legend>Juice</legend>
+        <label><input type="checkbox" id="opt-shake" /> Screen shake</label>
+        <label><input type="checkbox" id="opt-debris" /> Debris (shatter shards)</label>
+      </fieldset>
+      <fieldset>
+        <legend>Audio</legend>
+        <label><input type="radio" name="music" value="off" checked /> Music off</label>
         <label><input type="radio" name="music" value="between" /> Between Runs</label>
         <label><input type="radio" name="music" value="autorun" /> Autorun</label>
+        <label><input type="checkbox" id="opt-sfx" checked /> Sound effects</label>
       </fieldset>
-      <label><input type="checkbox" id="opt-sfx" checked /> Sound effects</label>
       <button id="opt-reseed" type="button">⟳ Reseed</button>
     </aside>
     <script type="module" src="/src/main.ts"></script>
