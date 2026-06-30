@@ -3,8 +3,9 @@
 // (rng.ts) for all randomness, so a run is reproducible and directly unit-testable.
 
 import { makeRng, random, range, type Rng } from './rng'
-import { bound, deflect, makeShape, outlinesTouch, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
+import { bound, makeShape, outlinesTouch, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
+import { bouncePillars, spawnPillars } from './pillars'
 import type { Asteroid, Bullet, FieldMode, Input, Pillar, Ship, World } from './entities'
 
 // --- Ship ---
@@ -30,11 +31,6 @@ const ASTEROID_POINTS_MAX = 12
 const CHILD_SCALE = 0.58 // child radius = parent radius * this
 const SAFE_SPAWN_DIST = 140 // keep fresh asteroids off the ship
 const MOTE_MAX_SPEED = 720 // clamp so the field can't fling motes off to infinity (high enough for a charged fling)
-
-// --- Pillars (static obstacles; sandbox knob) ---
-const PILLAR_SHIP_CLEAR = 30 // extra gap so a pillar never spawns on the centred ship, px
-const PILLAR_GAP = 24 // desired gap between two pillars' surfaces, px (best-effort)
-const PILLAR_TRIES = 24 // placement attempts before accepting a tight spot
 
 // --- Polarity field (the core verb): pull motes in / push them away ---
 // Reach, strength, charge time and the full-charge fling speed are sandbox knobs (read
@@ -117,28 +113,6 @@ function spawnChild(rng: Rng, parent: Asteroid, childCharge: number): Asteroid {
   }
 }
 
-// Place `count` static pillars in the inscribed disc (edges-agnostic, so it holds whether
-// the arena is the rectangle or the circle — a live toggle, not a generation knob). Each
-// sits at a seeded angle and an annulus radius clearing the centred ship and all four
-// walls; `margin` (a full mote diameter, 2× the max radius) leaves room for a mote to rest
-// on a rim pillar's far side without being pinned against the wall. Inter-pillar spacing is
-// best-effort, retried up to PILLAR_TRIES.
-function spawnPillars(rng: Rng, width: number, height: number, count: number, size: number, margin: number): Pillar[] {
-  const ringMin = SHIP_RADIUS + size + PILLAR_SHIP_CLEAR
-  const ringMax = Math.max(ringMin, Math.min(width, height) / 2 - size - margin)
-  const pillars: Pillar[] = []
-  for (let i = 0; i < count; i += 1) {
-    for (let t = 0; t < PILLAR_TRIES; t += 1) {
-      const a = random(rng) * Math.PI * 2
-      const rad = ringMin + random(rng) * (ringMax - ringMin)
-      const pos = { x: width / 2 + Math.cos(a) * rad, y: height / 2 + Math.sin(a) * rad }
-      const clear = pillars.every((p) => Math.hypot(p.pos.x - pos.x, p.pos.y - pos.y) > size + p.radius + PILLAR_GAP)
-      if (clear || t === PILLAR_TRIES - 1) { pillars.push({ pos, radius: size }); break }
-    }
-  }
-  return pillars
-}
-
 /** Build a fresh world: ship centred, a seeded asteroid field, no bullets, and (when the
  * knob is set) static pillars. Count / size / drift and the pillar count / size come from
  * config (defaulting to the shipped values), so the same seed regenerates the same arena
@@ -159,14 +133,8 @@ export function createWorld(seed: number, width: number, height: number, config:
   const asteroids = [...Array(config.moteCount).keys()].map(() =>
     spawnAsteroid(rng, width, height, config.moteSize, config.moteDrift, ship.pos),
   )
-  const pillars = config.pillarCount > 0 ? spawnPillars(rng, width, height, config.pillarCount, config.pillarSize, config.moteSize * 2) : []
+  const pillars = config.pillarCount > 0 ? spawnPillars(rng, width, height, config.pillarCount, config.pillarSize, config.moteSize * 2, SHIP_RADIUS) : []
   return { width, height, ship, bullets: [], asteroids, pillars, shatters: [], rngState: rng.s, t: 0 }
-}
-
-// Bounce a moving circle off every pillar in turn (pillars don't overlap, so folding the
-// deflections sequentially resolves cleanly).
-function bouncePillars(x: number, y: number, vx: number, vy: number, r: number, pillars: Pillar[]): { x: number, y: number, vx: number, vy: number } {
-  return pillars.reduce((s, p) => deflect(s.x, s.y, s.vx, s.vy, r, p.pos.x, p.pos.y, p.radius), { x, y, vx, vy })
 }
 
 // Turn, thrust, drag, clamp, then move (wrapping). Decrements the fire cooldown but
