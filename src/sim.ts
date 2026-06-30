@@ -32,15 +32,12 @@ const SAFE_SPAWN_DIST = 140 // keep fresh asteroids off the ship
 const MOTE_MAX_SPEED = 720 // clamp so the field can't fling motes off to infinity (high enough for a charged fling)
 
 // --- Polarity field (the core verb): pull motes in / push them away ---
-/** Reach of the ship's field, px. Exported so the view can draw the ring. */
-export const FIELD_RANGE = 260
-const FIELD_STRENGTH = 1100 // px/s^2 at the centre, falling linearly to 0 at the edge
-const VORTEX_RADIUS = FIELD_RANGE * 0.5 // motes settle onto this orbit shell in vortex mode
-const VORTEX_SWIRL_MIN = 170 // tangential orbit speed at zero charge, px/s
-const VORTEX_SWIRL_MAX = 640 // tangential orbit speed at full charge, px/s — the wound-up fling speed
+// Reach, strength, charge time and the full-charge fling speed are sandbox knobs (read
+// from Config); the constants below are the fixed *shape* of the vortex. The orbit shell
+// radius derives from the (configurable) field range, at half of it.
+const VORTEX_SWIRL_MIN = 170 // tangential orbit speed at zero charge, px/s (config sets the max)
 const VORTEX_SPRING = 3.5 // pull toward the shell radius, 1/s
 const VORTEX_RESPONSE = 6 // how fast a mote's velocity tracks the vortex target, 1/s
-const CHARGE_TIME = 1.4 // seconds of held vortex to reach full charge
 
 // --- Gather pulse (replaces a continuous attract): a discrete inward impulse ---
 /** Reach of a gather pulse, px. Exported so the view can size the ripple. */
@@ -158,7 +155,7 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
   // Charge builds while the vortex is held, and resets the moment it's released —
   // releasing/scattering then flings the motes at whatever orbit speed was wound up.
   const field = fieldMode(input, config)
-  const charge = field === 'vortex' ? Math.min(1, ship.charge + dt / CHARGE_TIME) : 0
+  const charge = field === 'vortex' ? Math.min(1, ship.charge + dt / config.chargeTime) : 0
   // The ship never dies at the edge (no game-over) — kill behaves like bounce for it.
   const shipMode = config.edges === 'kill' ? 'bounce' : config.edges
   const b = bound(ship.pos.x + vx * dt, ship.pos.y + vy * dt, vx, vy, SHIP_RADIUS, width, height, shipMode)
@@ -195,13 +192,13 @@ function pulseKick(a: Asteroid, shipPos: Vec2): Asteroid {
   return { ...a, charge: chargeTimeFor(a.radius), vel: { x: a.vel.x + (dx / dist) * kick, y: a.vel.y + (dy / dist) * kick } }
 }
 
-// Vortex steers a mote's velocity toward a rotating shell — a spring toward
-// VORTEX_RADIUS plus a tangential orbit speed — so motes circle the ship and stay
-// captured, instead of a constant tangential force spiralling them out of range.
-// (ux, uy) points from the mote toward the ship; `swirl` is the (charge-scaled)
+// Vortex steers a mote's velocity toward a rotating shell — a spring toward the shell
+// `radius` (half the field range) plus a tangential orbit speed — so motes circle the
+// ship and stay captured, instead of a constant tangential force spiralling them out of
+// range. (ux, uy) points from the mote toward the ship; `swirl` is the (charge-scaled)
 // tangential orbit speed.
-function vortexVel(ux: number, uy: number, dist: number, swirl: number, vx: number, vy: number, dt: number): Vec2 {
-  const radialOut = VORTEX_SPRING * (VORTEX_RADIUS - dist) // +outward inside the shell, -inward outside
+function vortexVel(ux: number, uy: number, dist: number, radius: number, swirl: number, vx: number, vy: number, dt: number): Vec2 {
+  const radialOut = VORTEX_SPRING * (radius - dist) // +outward inside the shell, -inward outside
   const targetX = -ux * radialOut + -uy * swirl // outward (-ux,-uy) + tangent (-uy, ux)
   const targetY = -uy * radialOut + ux * swirl
   const k = Math.min(1, VORTEX_RESPONSE * dt)
@@ -210,30 +207,30 @@ function vortexVel(ux: number, uy: number, dist: number, swirl: number, vx: numb
 
 // The polarity field's effect on a mote: the new velocity and whether the field
 // touched it (which (re)charges it). Extracted to keep stepMote flat.
-function fieldForce(ship: Ship, a: Asteroid, dt: number): { vx: number, vy: number, touched: boolean } {
+function fieldForce(ship: Ship, a: Asteroid, dt: number, config: Config): { vx: number, vy: number, touched: boolean } {
   const vx = a.vel.x
   const vy = a.vel.y
   if (ship.field === 'off') return { vx, vy, touched: false }
   const dx = ship.pos.x - a.pos.x
   const dy = ship.pos.y - a.pos.y
   const dist = Math.hypot(dx, dy)
-  if (dist <= 0 || dist >= FIELD_RANGE) return { vx, vy, touched: false }
+  if (dist <= 0 || dist >= config.fieldRange) return { vx, vy, touched: false }
   const ux = dx / dist
   const uy = dy / dist
   if (ship.field === 'vortex') {
-    const swirl = VORTEX_SWIRL_MIN + (VORTEX_SWIRL_MAX - VORTEX_SWIRL_MIN) * ship.charge
-    const v = vortexVel(ux, uy, dist, swirl, vx, vy, dt)
+    const swirl = VORTEX_SWIRL_MIN + (config.vortexSwirl - VORTEX_SWIRL_MIN) * ship.charge
+    const v = vortexVel(ux, uy, dist, config.fieldRange * 0.5, swirl, vx, vy, dt)
     return { vx: v.x, vy: v.y, touched: true }
   }
   // 'attract' = radial inward (ux,uy point at the ship); 'repel' = outward.
-  const mag = FIELD_STRENGTH * (1 - dist / FIELD_RANGE) * dt * (ship.field === 'attract' ? 1 : -1)
+  const mag = config.fieldStrength * (1 - dist / config.fieldRange) * dt * (ship.field === 'attract' ? 1 : -1)
   return { vx: vx + ux * mag, vy: vy + uy * mag, touched: true }
 }
 
 // Drift a mote: polarity field, then gravity well + friction (sandbox toggles), clamp,
 // move + spin (wrapping or bouncing). The field touching it (re)charges it.
 function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number, config: Config): Asteroid | null {
-  const f = fieldForce(ship, a, dt)
+  const f = fieldForce(ship, a, dt, config)
   let { vx, vy } = f
   if (config.well) {
     vx += (width / 2 - a.pos.x) * WELL_K * dt

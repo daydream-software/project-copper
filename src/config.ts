@@ -13,6 +13,14 @@ export interface Config {
   scatter: boolean
   /** Vortex (gather + scatter held) enabled. */
   vortex: boolean
+  /** Reach of the continuous field (attract / scatter / vortex), px. */
+  fieldRange: number
+  /** Field acceleration at the centre, px/s² (falls linearly to 0 at the edge). */
+  fieldStrength: number
+  /** Seconds of held vortex needed to wind up to full charge. */
+  chargeTime: number
+  /** Tangential orbit / fling speed at full vortex charge, px/s. */
+  vortexSwirl: number
   /** The dormant gun: firing bullets (press F) that split asteroids. */
   gun: boolean
   /** Charged motes split uncharged ones on contact. */
@@ -60,6 +68,10 @@ export const DEFAULT_CONFIG: Config = {
   edges: 'wrap',
   scatter: true,
   vortex: true,
+  fieldRange: 260,
+  fieldStrength: 1100,
+  chargeTime: 1.4,
+  vortexSwirl: 640,
   gun: false,
   chargedSplit: true,
   piercing: false,

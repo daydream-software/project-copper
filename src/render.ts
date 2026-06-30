@@ -2,7 +2,7 @@
 // Zero game logic — it only reads the world and writes the canvas. Everything is
 // geometry; there are no image assets. The palette and trails are sandbox options.
 
-import { FIELD_RANGE, PULSE_RANGE } from './sim'
+import { PULSE_RANGE } from './sim'
 import type { Config } from './config'
 import type { Vec2 } from './geometry'
 import type { Asteroid, FieldMode, World } from './entities'
@@ -47,7 +47,7 @@ export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config
   if (config.trails === 'full') drawGhosts(ctx, ghosts)
   else if (config.trails === 'dust') drawGrains(ctx, grains)
 
-  drawField(ctx, world)
+  drawField(ctx, world, config)
   drawAsteroids(ctx, world)
   drawBullets(ctx, world)
   drawShip(ctx, world)
@@ -117,9 +117,10 @@ function ringDash(mode: FieldMode): number[] {
 
 // The polarity field: faint tethers to the motes in reach, plus the reach ring
 // (solid = attract, dashed = repel, dotted = vortex). Drawn under the motes and ship.
-function drawField(ctx: CanvasRenderingContext2D, world: World): void {
+function drawField(ctx: CanvasRenderingContext2D, world: World, config: Config): void {
   const { ship } = world
   if (ship.field === 'off') return
+  const range = config.fieldRange
   ctx.strokeStyle = ship.field === 'repel' ? active.dim : active.stroke
 
   ctx.lineWidth = 1
@@ -127,7 +128,7 @@ function drawField(ctx: CanvasRenderingContext2D, world: World): void {
   for (const a of world.asteroids) {
     const dx = a.pos.x - ship.pos.x
     const dy = a.pos.y - ship.pos.y
-    if (dx * dx + dy * dy < FIELD_RANGE * FIELD_RANGE) {
+    if (dx * dx + dy * dy < range * range) {
       ctx.beginPath()
       ctx.moveTo(ship.pos.x, ship.pos.y)
       ctx.lineTo(a.pos.x, a.pos.y)
@@ -140,7 +141,7 @@ function drawField(ctx: CanvasRenderingContext2D, world: World): void {
   ctx.lineWidth = ship.field === 'vortex' ? 1.5 + ship.charge * 3 : 1.5
   ctx.setLineDash(ringDash(ship.field))
   ctx.beginPath()
-  ctx.arc(ship.pos.x, ship.pos.y, FIELD_RANGE, 0, Math.PI * 2)
+  ctx.arc(ship.pos.x, ship.pos.y, range, 0, Math.PI * 2)
   ctx.stroke()
   ctx.setLineDash([])
 

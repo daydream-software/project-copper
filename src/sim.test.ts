@@ -334,6 +334,40 @@ describe('mote field knobs', () => {
   })
 })
 
+describe('field knobs', () => {
+  it('fieldRange extends the field reach', () => {
+    const far = () => [mote(690, 0)] // dist 290 from the ship at x=400
+    const def = step(makeWorld({ asteroids: far() }), press({ attract: true }), DT, cfg({ gather: 'attract' }))
+    expect(def.asteroids[0].charge).toBe(0) // beyond the default 260 reach → untouched
+    const wide = step(makeWorld({ asteroids: far() }), press({ attract: true }), DT, cfg({ gather: 'attract', fieldRange: 360 }))
+    expect(wide.asteroids[0].charge).toBeGreaterThan(0) // now in reach
+    expect(wide.asteroids[0].vel.x).toBeLessThan(0) // pulled toward the ship on its left
+  })
+
+  it('fieldStrength scales the attract impulse', () => {
+    const at = () => [mote(500, 0)] // dist 100, well within range
+    const weak = step(makeWorld({ asteroids: at() }), press({ attract: true }), DT, cfg({ gather: 'attract', fieldStrength: 500 }))
+    const strong = step(makeWorld({ asteroids: at() }), press({ attract: true }), DT, cfg({ gather: 'attract', fieldStrength: 2000 }))
+    expect(Math.abs(strong.asteroids[0].vel.x)).toBeGreaterThan(Math.abs(weak.asteroids[0].vel.x))
+  })
+
+  it('chargeTime sets the vortex wind-up rate (shorter = faster)', () => {
+    const both = press({ attract: true, repel: true })
+    const fast = step(makeWorld(), both, DT, cfg({ chargeTime: 0.5 }))
+    const slow = step(makeWorld(), both, DT, cfg({ chargeTime: 3 }))
+    expect(fast.ship.charge).toBeGreaterThan(slow.ship.charge)
+  })
+
+  it('vortexSwirl sets the full-charge fling speed', () => {
+    // Ship already wound to full charge; a mote due-right gets a tangential kick ∝ swirl.
+    const wound = (swirl: number) => step(
+      makeWorld({ ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'vortex', charge: 1, pulseT: 99 }, asteroids: [mote(500, 0)] }),
+      press({ attract: true, repel: true }), DT, cfg({ vortexSwirl: swirl }),
+    )
+    expect(Math.abs(wound(900).asteroids[0].vel.y)).toBeGreaterThan(Math.abs(wound(300).asteroids[0].vel.y))
+  })
+})
+
 describe('edges mode', () => {
   const fastShip = { pos: { x: 799, y: 300 }, vel: { x: 300, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' as const, charge: 0, pulseT: 99 }
 
