@@ -20,7 +20,16 @@ body {
   overflow: hidden;
 }
 
+/* Panel + canvas are a flex row so they never overlap: the panel takes its natural
+   width on the left, the canvas centres in (and shrinks to fit) the space that's left.
+   On narrow screens the canvas scales down instead of sliding under the panel. */
+body {
+  display: flex;
+}
+
 main {
+  flex: 1 1 auto;
+  min-width: 0; /* let the canvas (max-width:100%) shrink below its intrinsic size */
   display: grid;
   place-items: center;
   gap: 0.75rem;
@@ -50,12 +59,14 @@ main {
   user-select: none;
 }
 
-/* Sandbox options panel — floats over the canvas, top-left. It scrolls if it outgrows
-   the viewport so every control (Reseed, SFX…) stays reachable. */
+/* Sandbox options panel — a fixed-width sidebar on the left (order:-1 puts it before
+   the canvas in the flex row). Pinned to the top (align-self) at its natural height; it
+   scrolls if it outgrows the viewport so every control (Reseed, SFX…) stays reachable. */
 #panel {
-  position: fixed;
-  top: 1rem;
-  left: 1rem;
+  order: -1;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  margin: 1rem;
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
   scrollbar-width: thin;
