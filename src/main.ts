@@ -334,16 +334,22 @@ function stepShards(): void {
   if (shards.length > SHARD_MAX) shards = shards.slice(-SHARD_MAX)
 }
 
-// Drop a dust grain near a point: small, jittered, faint, short-lived.
-function dropGrain(x: number, y: number): void {
-  if (Math.random() > 0.55) return
-  grains.push({ x: x + (Math.random() * 2 - 1) * 4, y: y + (Math.random() * 2 - 1) * 4, life: 14, max: 14, r: 1, a: 0.45 })
+// Drop dust over an entity's footprint: faint short-lived grains scattered across a disc of
+// the given radius, with more grains for bigger motes — so the dust trail is proportional to
+// the mote, not a single dot at its centre. (sqrt → grains spread evenly over the disc.)
+function dropGrain(x: number, y: number, radius: number): void {
+  const n = Math.max(1, Math.round(radius / 16)) // grain count scales with the mote
+  for (let i = 0; i < n; i += 1) {
+    const a = Math.random() * Math.PI * 2
+    const d = Math.sqrt(Math.random()) * radius
+    grains.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, life: 14, max: 14, r: 1, a: 0.4 })
+  }
 }
 
 function spawnTrail(): void {
   if (config.trails === 'dust') {
-    dropGrain(world.ship.pos.x, world.ship.pos.y)
-    if (config.trailMotes) for (const m of world.asteroids) dropGrain(m.pos.x, m.pos.y)
+    dropGrain(world.ship.pos.x, world.ship.pos.y, 14) // the ship's footprint is small + fixed
+    if (config.trailMotes) for (const m of world.asteroids) dropGrain(m.pos.x, m.pos.y, m.radius)
   } else if (config.trails === 'full') {
     const s = world.ship
     ghosts.push({ x: s.pos.x, y: s.pos.y, angle: s.angle, radius: 0, shape: [], ship: true, life: GHOST_LIFE, max: GHOST_LIFE })
