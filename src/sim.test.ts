@@ -401,6 +401,17 @@ describe('pillars', () => {
     }
   })
 
+  it('leaves room for a mote to rest against a rim pillar inside the arena', () => {
+    const moteR = 48 // default mote radius
+    const w = createWorld(7, 720, 720, cfg({ pillarCount: 6, pillarSize: 40, moteSize: moteR }))
+    for (const p of w.pillars) {
+      const d = Math.hypot(p.pos.x - 360, p.pos.y - 360)
+      // a mote pushed onto the pillar's far side (centre at d + pillarR + moteR) must stay
+      // inside the mote-centre boundary (360 − moteR) — else deflect and bound fight at the rim
+      expect(d + p.radius + moteR).toBeLessThanOrEqual(360 - moteR + 1e-6)
+    }
+  })
+
   it('a mote moving into a pillar bounces off it', () => {
     const pillar = { pos: { x: 400, y: 300 }, radius: 40 }
     const m = { pos: { x: 450, y: 300 }, vel: { x: -100, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 0 }

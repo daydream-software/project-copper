@@ -120,8 +120,9 @@ function spawnChild(rng: Rng, parent: Asteroid, childCharge: number): Asteroid {
 // Place `count` static pillars in the inscribed disc (edges-agnostic, so it holds whether
 // the arena is the rectangle or the circle — a live toggle, not a generation knob). Each
 // sits at a seeded angle and an annulus radius clearing the centred ship and all four
-// walls; `margin` (max mote radius) stops a rim pillar pinning motes against the circle
-// wall. Inter-pillar spacing is best-effort, retried up to PILLAR_TRIES.
+// walls; `margin` (a full mote diameter, 2× the max radius) leaves room for a mote to rest
+// on a rim pillar's far side without being pinned against the wall. Inter-pillar spacing is
+// best-effort, retried up to PILLAR_TRIES.
 function spawnPillars(rng: Rng, width: number, height: number, count: number, size: number, margin: number): Pillar[] {
   const ringMin = SHIP_RADIUS + size + PILLAR_SHIP_CLEAR
   const ringMax = Math.max(ringMin, Math.min(width, height) / 2 - size - margin)
@@ -158,7 +159,7 @@ export function createWorld(seed: number, width: number, height: number, config:
   const asteroids = [...Array(config.moteCount).keys()].map(() =>
     spawnAsteroid(rng, width, height, config.moteSize, config.moteDrift, ship.pos),
   )
-  const pillars = config.pillarCount > 0 ? spawnPillars(rng, width, height, config.pillarCount, config.pillarSize, config.moteSize) : []
+  const pillars = config.pillarCount > 0 ? spawnPillars(rng, width, height, config.pillarCount, config.pillarSize, config.moteSize * 2) : []
   return { width, height, ship, bullets: [], asteroids, pillars, shatters: [], rngState: rng.s, t: 0 }
 }
 
