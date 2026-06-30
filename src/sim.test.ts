@@ -36,6 +36,7 @@ function makeWorld(over: Partial<World> = {}): World {
     bullets: [],
     asteroids: [],
     pillars: [],
+    shatters: [],
     rngState: 12345,
     t: 0,
     ...over,
@@ -366,6 +367,20 @@ describe('field knobs', () => {
       press({ attract: true, repel: true }), DT, cfg({ vortexSwirl: swirl }),
     )
     expect(Math.abs(wound(900).asteroids[0].vel.y)).toBeGreaterThan(Math.abs(wound(300).asteroids[0].vel.y))
+  })
+})
+
+describe('shatter centres (debris source)', () => {
+  it('a charged shatter records its centre on the world', () => {
+    const w = step(makeWorld({ asteroids: [moteAt(300, 300, 48, 2), moteAt(300, 300, 48, 0)] }), NONE, DT)
+    expect(w.shatters.length).toBeGreaterThan(0)
+    expect(w.shatters[0].x).toBeCloseTo(300, 0)
+    expect(w.shatters[0].y).toBeCloseTo(300, 0)
+  })
+
+  it('a step with no shatter leaves the centres empty', () => {
+    const w = step(makeWorld({ asteroids: [moteAt(300, 300, 48, 0)] }), NONE, DT)
+    expect(w.shatters).toHaveLength(0)
   })
 })
 

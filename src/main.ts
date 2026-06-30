@@ -4,7 +4,7 @@
 import './style.css'
 import { createWorld, step } from './sim'
 import type { Config } from './config'
-import { draw, type Ghost, type TrailDot } from './render'
+import { draw, type Ghost, type Shard, type TrailDot } from './render'
 import { createInput } from './input'
 import { createLoop } from './loop'
 import { resumeAudio, setMusic, setSfx, sfxPulse, sfxShatter } from './audio'
@@ -71,6 +71,7 @@ function readPanel(): Config {
     trails: trails === 'dust' || trails === 'full' ? trails : 'off',
     trailMotes: checked('#opt-trailMotes'),
     shake: checked('#opt-shake'),
+    debris: checked('#opt-debris'),
     palette: palette === 'mono' || palette === 'neon' ? palette : 'copper',
   }
 }
@@ -189,6 +190,37 @@ const GRAIN_MAX = 1200
 const GHOST_LIFE = 28
 const GHOST_MAX = 1800
 
+// Debris shards: spawned per fixed step from world.shatters (so a shatter in a caught-up
+// sub-step is never missed), then moved + faded per render frame. The drawn record is a
+// view-only Shard; main carries velocity (px/frame) on a local superset so draw() still
+// takes a plain Shard[].
+type LiveShard = Shard & { vx: number, vy: number }
+let shards: LiveShard[] = []
+const SHARD_MAX = 600
+
+// Spawn a burst of shards at a shatter centre — a few segments flying out radially.
+function spawnShards(x: number, y: number): void {
+  const n = 5 + Math.floor(Math.random() * 3) // 5–7 per shatter
+  for (let i = 0; i < n; i += 1) {
+    const a = Math.random() * Math.PI * 2
+    const sp = 1.5 + Math.random() * 3.5 // px/frame
+    const life = 20 + Math.floor(Math.random() * 10)
+    shards.push({ x, y, angle: a, len: 5 + Math.random() * 7, life, max: life, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp })
+  }
+}
+
+function stepShards(): void {
+  for (const s of shards) {
+    s.x += s.vx
+    s.y += s.vy
+    s.vx *= 0.9 // ease out so shards decelerate as they fade
+    s.vy *= 0.9
+    s.life -= 1
+  }
+  shards = shards.filter((s) => s.life > 0)
+  if (shards.length > SHARD_MAX) shards = shards.slice(-SHARD_MAX)
+}
+
 // Drop a dust grain near a point: small, jittered, faint, short-lived.
 function dropGrain(x: number, y: number): void {
   if (Math.random() > 0.55) return
@@ -226,10 +258,14 @@ const loop = createLoop(
     // only feed it to the sim when gather is in pulse mode.
     const pulse = input.consumePulse()
     world = step(world, { ...input.state, pulse: config.gather === 'pulse' ? pulse : false }, dt, config)
+    // Spawn debris here (per fixed step), not in render: a shatter in a caught-up sub-step
+    // is otherwise overwritten before the next draw and its debris would be lost.
+    if (config.debris) for (const c of world.shatters) spawnShards(c.x, c.y)
   },
   () => {
     stepTrail()
-    draw(ctx, world, config, grains, ghosts)
+    stepShards()
+    draw(ctx, world, config, grains, ghosts, shards)
     const grew = world.asteroids.length > prevCount // motes split (heuristic: count grew)
     if (world.ship.pulseT < 0.05 && prevPulseT > 0.1) sfxPulse()
     if (grew) sfxShatter()

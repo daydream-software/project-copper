@@ -159,15 +159,13 @@ export function createWorld(seed: number, width: number, height: number, config:
     spawnAsteroid(rng, width, height, config.moteSize, config.moteDrift, ship.pos),
   )
   const pillars = config.pillarCount > 0 ? spawnPillars(rng, width, height, config.pillarCount, config.pillarSize, config.moteSize) : []
-  return { width, height, ship, bullets: [], asteroids, pillars, rngState: rng.s, t: 0 }
+  return { width, height, ship, bullets: [], asteroids, pillars, shatters: [], rngState: rng.s, t: 0 }
 }
 
 // Bounce a moving circle off every pillar in turn (pillars don't overlap, so folding the
 // deflections sequentially resolves cleanly).
 function bouncePillars(x: number, y: number, vx: number, vy: number, r: number, pillars: Pillar[]): { x: number, y: number, vx: number, vy: number } {
-  let s = { x, y, vx, vy }
-  for (const p of pillars) s = deflect(s.x, s.y, s.vx, s.vy, r, p.pos.x, p.pos.y, p.radius)
-  return s
+  return pillars.reduce((s, p) => deflect(s.x, s.y, s.vx, s.vy, r, p.pos.x, p.pos.y, p.radius), { x, y, vx, vy })
 }
 
 // Turn, thrust, drag, clamp, then move (wrapping). Decrements the fire cooldown but
@@ -443,17 +441,19 @@ function burstPush(m: Asteroid, centers: Vec2[]): Asteroid {
   return { ...m, vel: { x: vx, y: vy } }
 }
 
-function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Asteroid[] {
-  if (motes.length >= MAX_MOTES) return motes // safety valve: stop splitting (chain guard)
+// Shatter centres are collected for every charged hit (the `shatters` output, which the
+// view turns into debris); burst reuses the same centres as shockwave origins.
+function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): { asteroids: Asteroid[], shatters: Vec2[] } {
+  if (motes.length >= MAX_MOTES) return { asteroids: motes, shatters: [] } // safety valve: stop splitting
   const { targets, chargers } = findMoteSplits(motes)
   const out: Asteroid[] = []
-  const bursts: Vec2[] = []
+  const shatters: Vec2[] = []
   for (const [idx, m] of motes.entries()) {
     // Both motes shatter on a charged hit — including the charger itself, unless
     // piercing, where it survives whole (keeping its charge) and plows through.
-    const shatters = targets.has(idx) || (chargers.has(idx) && !config.piercing)
-    if (shatters) {
-      if (config.burst) bursts.push(m.pos) // overcharge → shockwave centre
+    const isShatter = targets.has(idx) || (chargers.has(idx) && !config.piercing)
+    if (isShatter) {
+      shatters.push({ x: m.pos.x, y: m.pos.y }) // a debris / shockwave origin
       if (m.radius > ASTEROID_MIN_RADIUS) {
         // Chain reaction: fragments are born charged (duration scaled to their size).
         const cc = config.chainReaction ? chargeTimeFor(m.radius * CHILD_SCALE) : 0
@@ -464,7 +464,7 @@ function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Ast
       out.push(m)
     }
   }
-  return bursts.length > 0 ? out.map((m) => burstPush(m, bursts)) : out
+  return { asteroids: config.burst && shatters.length > 0 ? out.map((m) => burstPush(m, shatters)) : out, shatters }
 }
 
 // Advance existing bullets, age them, cull the expired.
@@ -521,14 +521,14 @@ function resolveCollisions(rng: Rng, bullets: Bullet[], asteroids: Asteroid[]): 
 
 // The post-movement mote passes, gated by config: charged repel, mote↔mote bounce,
 // charged-split, (dormant) bullet hits, then conduction.
-function reactMotes(rng: Rng, motes: Asteroid[], bullets: Bullet[], config: Config, dt: number): { asteroids: Asteroid[], bullets: Bullet[] } {
+function reactMotes(rng: Rng, motes: Asteroid[], bullets: Bullet[], config: Config, dt: number): { asteroids: Asteroid[], bullets: Bullet[], shatters: Vec2[] } {
   const repelled = config.chargedRepel ? applyChargedRepel(motes, dt) : motes
   const bip = config.bipolar ? applyBipolar(repelled, dt) : repelled
   const bounced = config.moteCollision ? resolveMoteBounce(bip) : bip
-  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, bounced, config) : bounced
-  const hit = resolveCollisions(rng, bullets, reacted)
+  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, bounced, config) : { asteroids: bounced, shatters: [] }
+  const hit = resolveCollisions(rng, bullets, reacted.asteroids)
   const conducted = config.conduction ? applyConduction(hit.asteroids) : hit.asteroids
-  return { asteroids: conducted, bullets: hit.bullets }
+  return { asteroids: conducted, bullets: hit.bullets, shatters: reacted.shatters }
 }
 
 /** Advance the world one fixed timestep. Pure: returns a new world. `config` selects
@@ -563,6 +563,7 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
     bullets: reacted.bullets,
     asteroids: [...reacted.asteroids, ...refill],
     pillars: world.pillars, // static: carried through unchanged
+    shatters: reacted.shatters, // this step's shatter centres (debris source)
     rngState: rng.s,
     t: world.t + dt,
   }

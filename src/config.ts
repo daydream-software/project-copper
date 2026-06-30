@@ -63,6 +63,8 @@ export interface Config {
   trailMotes: boolean
   /** Screen-shake on shatters. */
   shake: boolean
+  /** Line-shard debris flung from each shatter (a view-only flourish). */
+  debris: boolean
   /** Colour theme. */
   palette: 'copper' | 'mono' | 'neon'
 }
@@ -97,5 +99,6 @@ export const DEFAULT_CONFIG: Config = {
   trails: 'off',
   trailMotes: true,
   shake: false,
+  debris: false,
   palette: 'copper',
 }

@@ -85,6 +85,9 @@ export interface World {
   asteroids: Asteroid[]
   /** Static obstacles (a sandbox knob; empty when pillarCount is 0). */
   pillars: Pillar[]
+  /** Centres of motes that shattered this step (transient: recomputed each step, empty
+   * on a step with no shatter). The view spawns debris shards from these. */
+  shatters: Vec2[]
   /** Serialisable PRNG cursor (see rng.ts) — makes the field reproducible. */
   rngState: number
   /** Elapsed sim time, seconds. */

@@ -22,12 +22,14 @@ const PULSE_FLASH = 0.35 // seconds the gather-pulse ripple stays visible
 // grain; `Ghost` is a faded snapshot of an entity's outline (the full trail).
 export interface TrailDot { x: number, y: number, life: number, max: number, r: number, a: number }
 export interface Ghost { x: number, y: number, angle: number, radius: number, shape: Vec2[], ship: boolean, life: number, max: number }
+// A debris shard: a short line segment flung from a shatter, oriented along its flight.
+export interface Shard { x: number, y: number, angle: number, len: number, life: number, max: number }
 
 // The active palette for this frame — set at the top of draw(), read by the helpers.
 let active: Palette = PALETTES.copper
 let showPolarity = false // draw +/- marks on charged motes (bipolar mode)
 
-export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config, grains: TrailDot[], ghosts: Ghost[]): void {
+export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config, grains: TrailDot[], ghosts: Ghost[], shards: Shard[]): void {
   active = PALETTES[config.palette]
   showPolarity = config.bipolar
   ctx.fillStyle = active.bg // full opaque clear — no fade residue ever
@@ -53,6 +55,25 @@ export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config
   drawBullets(ctx, world)
   drawShip(ctx, world)
   drawPulse(ctx, world)
+  drawShards(ctx, shards)
+}
+
+// Debris: short bright line shards flung from a shatter, fading as they fly out. Owned
+// and aged by main (like the trail particles); drawn on top, in the charged colour so
+// they read as sparks off the shattering motes.
+function drawShards(ctx: CanvasRenderingContext2D, shards: Shard[]): void {
+  ctx.strokeStyle = active.charged
+  ctx.lineWidth = 1.5
+  for (const s of shards) {
+    ctx.globalAlpha = s.life / s.max
+    const hx = Math.cos(s.angle) * s.len * 0.5
+    const hy = Math.sin(s.angle) * s.len * 0.5
+    ctx.beginPath()
+    ctx.moveTo(s.x - hx, s.y - hy)
+    ctx.lineTo(s.x + hx, s.y + hy)
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
 }
 
 // Dust grains: sparse fading dots (main decides the spawn pattern).
