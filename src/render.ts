@@ -37,7 +37,7 @@ export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config
     ctx.strokeStyle = active.dim
     ctx.lineWidth = 1.5
     ctx.beginPath()
-    ctx.arc(world.width / 2, world.height / 2, Math.min(world.width, world.height) / 2, 0, Math.PI * 2)
+    ctx.arc(world.width / 2, world.height / 2, Math.min(world.width, world.height) / 2 - 1.5, 0, Math.PI * 2)
     ctx.stroke()
   }
 

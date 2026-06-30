@@ -88,7 +88,10 @@ function applyAudio(): void {
 // In circle mode, clip the canvas itself to a circle so the arena *is* the circle
 // (the rectangular corners/margins are hidden), not a circle drawn inside a rectangle.
 function applyArenaShape(): void {
-  if (canvas !== null) canvas.style.clipPath = config.edges === 'circle' ? 'circle(closest-side)' : ''
+  if (canvas === null) return
+  const circle = config.edges === 'circle'
+  canvas.style.clipPath = circle ? 'circle(closest-side)' : '' // clip the canvas to a circle
+  canvas.style.border = circle ? 'none' : '' // drop the rectangular frame ('' reverts to the CSS border)
 }
 
 // Browsers block audio until a user gesture. On the first one, resume the context AND
