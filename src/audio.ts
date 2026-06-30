@@ -83,8 +83,8 @@ export function sfxPulse(): void {
   const osc = c.createOscillator()
   const gain = c.createGain()
   osc.type = 'sine'
-  osc.frequency.setValueAtTime(440, t)
-  osc.frequency.exponentialRampToValueAtTime(150, t + 0.16)
+  osc.frequency.setValueAtTime(380 + Math.random() * 140, t) // 380–520 Hz: a little tug-pitch variation
+  osc.frequency.exponentialRampToValueAtTime(140 + Math.random() * 40, t + 0.16)
   gain.gain.setValueAtTime(0.16, t)
   gain.gain.exponentialRampToValueAtTime(0.0008, t + 0.19)
   osc.connect(gain)
@@ -93,13 +93,14 @@ export function sfxPulse(): void {
   osc.stop(t + 0.2)
 }
 
-/** Shatter: a short filtered noise crack. */
+/** Shatter: a short filtered noise crack. Every parameter is jittered per call so a popcorn
+ * cascade of shatters is a spread of distinct pops, not one sound on repeat. */
 export function sfxShatter(): void {
   const s = sfxOut()
   if (s === null) return
   const { c, out } = s
   const t = c.currentTime
-  const len = Math.floor(c.sampleRate * 0.18)
+  const len = Math.floor(c.sampleRate * (0.12 + Math.random() * 0.1)) // snap length, 0.12–0.22s
   const buf = c.createBuffer(1, len, c.sampleRate)
   const data = buf.getChannelData(0)
   for (let i = 0; i < len; i += 1) {
@@ -109,9 +110,10 @@ export function sfxShatter(): void {
   src.buffer = buf
   const hp = c.createBiquadFilter()
   hp.type = 'highpass'
-  hp.frequency.value = 700
+  hp.frequency.value = 500 + Math.random() * 600 // 500–1100 Hz: darker ↔ brighter pop
+  hp.Q.value = 0.7 + Math.random() * 1.6 // a little resonance → a faint, varied pop pitch
   const gain = c.createGain()
-  gain.gain.value = 0.22
+  gain.gain.value = 0.16 + Math.random() * 0.1
   src.connect(hp)
   hp.connect(gain)
   gain.connect(out)
