@@ -4,7 +4,7 @@
 
 import { PULSE_RANGE } from './sim'
 import type { Config } from './config'
-import { wrapImages, type Vec2 } from './geometry'
+import { axisDelta, wrapImages, type Vec2 } from './geometry'
 import type { Asteroid, FieldMode, World } from './entities'
 
 interface Palette { bg: string, stroke: string, dim: string, charged: string }
@@ -54,15 +54,16 @@ export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config
   drawAsteroids(ctx, world, config)
   drawBullets(ctx, world, config)
   drawShip(ctx, world, config)
-  drawPulse(ctx, world)
+  drawPulse(ctx, world, config)
   drawShards(ctx, shards)
 }
 
-// In wrap mode an entity straddling an edge must also appear on the opposite edge — a true
-// toroidal wrap. Only the things that actually move through bound(…, 'wrap') get wrapped:
-// motes, bullets, the ship. The field ring / charge gauge / pulse ripple / tethers are
-// drawn from raw straight-line distances that stop at the seam, so wrapping them would show
-// reach that isn't there — they stay single (drawField / drawPulse untouched).
+// In wrap mode an entity (or field reach) straddling an edge must also appear on the
+// opposite edge — a true toroidal wrap. Wrapped: the things that wrap in the sim — motes,
+// bullets, the ship, and now the ship's field (reach ring, gauge, pulse, tethers), since
+// fieldForce / pulseKick measure the toroidal distance and so reach across the seam. (Trail
+// particles still don't wrap.) `r` is the bounding radius that decides when a second image
+// is needed.
 function images(world: World, config: Config, x: number, y: number, r: number): Vec2[] {
   return config.edges === 'wrap' ? wrapImages(x, y, r, world.width, world.height) : [{ x, y }]
 }
@@ -146,16 +147,19 @@ function drawPillars(ctx: CanvasRenderingContext2D, world: World): void {
 }
 
 // A gather pulse: a ring that collapses inward from PULSE_RANGE and fades — a sharp tug.
-function drawPulse(ctx: CanvasRenderingContext2D, world: World): void {
+// Toroidal in wrap mode (like the pulse force), so the ripple wraps across the seam.
+function drawPulse(ctx: CanvasRenderingContext2D, world: World, config: Config): void {
   const { ship } = world
   if (ship.pulseT >= PULSE_FLASH) return
   const k = ship.pulseT / PULSE_FLASH // 0 -> 1 across the flash
   ctx.strokeStyle = active.stroke
   ctx.lineWidth = 2
   ctx.globalAlpha = 0.85 * (1 - k)
-  ctx.beginPath()
-  ctx.arc(ship.pos.x, ship.pos.y, (1 - k) * PULSE_RANGE, 0, Math.PI * 2)
-  ctx.stroke()
+  for (const s of images(world, config, ship.pos.x, ship.pos.y, PULSE_RANGE)) {
+    ctx.beginPath()
+    ctx.arc(s.x, s.y, (1 - k) * PULSE_RANGE, 0, Math.PI * 2)
+    ctx.stroke()
+  }
   ctx.globalAlpha = 1
 }
 
@@ -166,42 +170,49 @@ function ringDash(mode: FieldMode): number[] {
   return []
 }
 
-// The polarity field: faint tethers to the motes in reach, plus the reach ring
-// (solid = attract, dashed = repel, dotted = vortex). Drawn under the motes and ship.
+// The polarity field: faint tethers to the motes in reach, the reach ring (solid = attract,
+// dashed = repel, dotted = vortex) and the vortex gauge. The field is toroidal in wrap mode,
+// so the whole overlay is drawn at each wrapped ship image. Drawn under the motes and ship.
 function drawField(ctx: CanvasRenderingContext2D, world: World, config: Config): void {
   const { ship } = world
   if (ship.field === 'off') return
-  const range = config.fieldRange
-  ctx.strokeStyle = ship.field === 'repel' ? active.dim : active.stroke
+  for (const s of images(world, config, ship.pos.x, ship.pos.y, config.fieldRange)) {
+    drawFieldAt(ctx, world, config, s.x, s.y)
+  }
+}
 
+// The field overlay around one (possibly wrapped) ship position (sx, sy).
+function drawFieldAt(ctx: CanvasRenderingContext2D, world: World, config: Config, sx: number, sy: number): void {
+  const { ship } = world
+  const range = config.fieldRange
+  const wrap = config.edges === 'wrap'
+  ctx.strokeStyle = ship.field === 'repel' ? active.dim : active.stroke
   ctx.lineWidth = 1
   ctx.globalAlpha = 0.3
   for (const a of world.asteroids) {
-    const dx = a.pos.x - ship.pos.x
-    const dy = a.pos.y - ship.pos.y
+    const dx = axisDelta(sx, a.pos.x, world.width, wrap) // tether to the mote's nearest image,
+    const dy = axisDelta(sy, a.pos.y, world.height, wrap) // so a cross-seam tether points at the seam
     if (dx * dx + dy * dy < range * range) {
       ctx.beginPath()
-      ctx.moveTo(ship.pos.x, ship.pos.y)
-      ctx.lineTo(a.pos.x, a.pos.y)
+      ctx.moveTo(sx, sy)
+      ctx.lineTo(sx + dx, sy + dy)
       ctx.stroke()
     }
   }
   ctx.globalAlpha = 1
-
   // Reach ring — for the vortex it thickens as charge winds up.
   ctx.lineWidth = ship.field === 'vortex' ? 1.5 + ship.charge * 3 : 1.5
   ctx.setLineDash(ringDash(ship.field))
   ctx.beginPath()
-  ctx.arc(ship.pos.x, ship.pos.y, range, 0, Math.PI * 2)
+  ctx.arc(sx, sy, range, 0, Math.PI * 2)
   ctx.stroke()
   ctx.setLineDash([])
-
   // Charge gauge: an arc around the ship that fills as the vortex winds up.
   if (ship.field === 'vortex') {
     ctx.lineWidth = 3
     ctx.strokeStyle = active.stroke
     ctx.beginPath()
-    ctx.arc(ship.pos.x, ship.pos.y, 30, -Math.PI / 2, -Math.PI / 2 + ship.charge * Math.PI * 2)
+    ctx.arc(sx, sy, 30, -Math.PI / 2, -Math.PI / 2 + ship.charge * Math.PI * 2)
     ctx.stroke()
   }
 }
