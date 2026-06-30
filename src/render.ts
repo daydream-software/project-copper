@@ -4,7 +4,7 @@
 
 import { PULSE_RANGE } from './sim'
 import type { Config } from './config'
-import type { Vec2 } from './geometry'
+import { wrapImages, type Vec2 } from './geometry'
 import type { Asteroid, FieldMode, World } from './entities'
 
 interface Palette { bg: string, stroke: string, dim: string, charged: string }
@@ -51,11 +51,20 @@ export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config
 
   drawPillars(ctx, world)
   drawField(ctx, world, config)
-  drawAsteroids(ctx, world)
-  drawBullets(ctx, world)
-  drawShip(ctx, world)
+  drawAsteroids(ctx, world, config)
+  drawBullets(ctx, world, config)
+  drawShip(ctx, world, config)
   drawPulse(ctx, world)
   drawShards(ctx, shards)
+}
+
+// In wrap mode an entity straddling an edge must also appear on the opposite edge — a true
+// toroidal wrap. Only the things that actually move through bound(…, 'wrap') get wrapped:
+// motes, bullets, the ship. The field ring / charge gauge / pulse ripple / tethers are
+// drawn from raw straight-line distances that stop at the seam, so wrapping them would show
+// reach that isn't there — they stay single (drawField / drawPulse untouched).
+function images(world: World, config: Config, x: number, y: number, r: number): Vec2[] {
+  return config.edges === 'wrap' ? wrapImages(x, y, r, world.width, world.height) : [{ x, y }]
 }
 
 // Debris: short bright line shards flung from a shatter, fading as they fly out. Owned
@@ -197,7 +206,7 @@ function drawField(ctx: CanvasRenderingContext2D, world: World, config: Config):
   }
 }
 
-function drawAsteroids(ctx: CanvasRenderingContext2D, world: World): void {
+function drawAsteroids(ctx: CanvasRenderingContext2D, world: World, config: Config): void {
   for (const a of world.asteroids) {
     // Charged motes glow brighter/thicker — they split others (and spread via conduction).
     const charged = a.charge > 0
@@ -205,70 +214,79 @@ function drawAsteroids(ctx: CanvasRenderingContext2D, world: World): void {
     ctx.lineWidth = charged ? 3 : 2
     ctx.shadowBlur = charged ? 10 : 0
     ctx.shadowColor = charged ? active.charged : 'transparent'
-    ctx.save()
-    ctx.translate(a.pos.x, a.pos.y)
-    ctx.rotate(a.angle)
-    ctx.beginPath()
-    for (const [i, v] of a.shape.entries()) {
-      const x = v.x * a.radius
-      const y = v.y * a.radius
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
+    // +12 pads the bounding radius for the glow so the wrapped copy appears before the
+    // shadow clips at the seam (uncharged motes don't glow but the slack is harmless).
+    for (const img of images(world, config, a.pos.x, a.pos.y, a.radius + 12)) {
+      ctx.save()
+      ctx.translate(img.x, img.y)
+      ctx.rotate(a.angle)
+      ctx.beginPath()
+      for (const [i, v] of a.shape.entries()) {
+        const x = v.x * a.radius
+        const y = v.y * a.radius
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.closePath()
+      ctx.stroke()
+      ctx.restore()
+      drawPolarityMark(ctx, a, charged, img.x, img.y)
     }
-    ctx.closePath()
-    ctx.stroke()
-    ctx.restore()
-    drawPolarityMark(ctx, a, charged)
   }
   ctx.shadowBlur = 0 // don't let the charged-mote glow bleed into the bullets/ship
 }
 
-// In bipolar mode, mark a charged mote's polarity with a + (positive) or − (negative).
-function drawPolarityMark(ctx: CanvasRenderingContext2D, a: Asteroid, charged: boolean): void {
+// In bipolar mode, mark a charged mote's polarity with a + (positive) or − (negative), at
+// the given draw centre (which may be a wrapped copy's position).
+function drawPolarityMark(ctx: CanvasRenderingContext2D, a: Asteroid, charged: boolean, cx: number, cy: number): void {
   if (!showPolarity || !charged) return
   ctx.beginPath()
-  ctx.moveTo(a.pos.x - 4, a.pos.y)
-  ctx.lineTo(a.pos.x + 4, a.pos.y)
+  ctx.moveTo(cx - 4, cy)
+  ctx.lineTo(cx + 4, cy)
   if ((a.polarity ?? 1) > 0) {
-    ctx.moveTo(a.pos.x, a.pos.y - 4)
-    ctx.lineTo(a.pos.x, a.pos.y + 4)
+    ctx.moveTo(cx, cy - 4)
+    ctx.lineTo(cx, cy + 4)
   }
   ctx.stroke()
 }
 
-function drawBullets(ctx: CanvasRenderingContext2D, world: World): void {
+function drawBullets(ctx: CanvasRenderingContext2D, world: World, config: Config): void {
   ctx.fillStyle = active.stroke
   for (const b of world.bullets) {
-    ctx.beginPath()
-    ctx.arc(b.pos.x, b.pos.y, 2.5, 0, Math.PI * 2)
-    ctx.fill()
+    for (const img of images(world, config, b.pos.x, b.pos.y, 3)) {
+      ctx.beginPath()
+      ctx.arc(img.x, img.y, 2.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
   }
 }
 
-function drawShip(ctx: CanvasRenderingContext2D, world: World): void {
+function drawShip(ctx: CanvasRenderingContext2D, world: World, config: Config): void {
   const { ship } = world
-  ctx.save()
-  ctx.translate(ship.pos.x, ship.pos.y)
-  ctx.rotate(ship.angle)
+  for (const img of images(world, config, ship.pos.x, ship.pos.y, 19)) { // 19 ≈ flame-tip reach
+    ctx.save()
+    ctx.translate(img.x, img.y)
+    ctx.rotate(ship.angle)
 
-  ctx.strokeStyle = active.stroke
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(0, -16) // nose (up)
-  ctx.lineTo(11, 12) // back-right
-  ctx.lineTo(0, 6) // tail notch
-  ctx.lineTo(-11, 12) // back-left
-  ctx.closePath()
-  ctx.stroke()
-
-  if (ship.thrusting) {
-    ctx.strokeStyle = active.dim
+    ctx.strokeStyle = active.stroke
+    ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(-5, 9)
-    ctx.lineTo(0, 19)
-    ctx.lineTo(5, 9)
+    ctx.moveTo(0, -16) // nose (up)
+    ctx.lineTo(11, 12) // back-right
+    ctx.lineTo(0, 6) // tail notch
+    ctx.lineTo(-11, 12) // back-left
+    ctx.closePath()
     ctx.stroke()
-  }
 
-  ctx.restore()
+    if (ship.thrusting) {
+      ctx.strokeStyle = active.dim
+      ctx.beginPath()
+      ctx.moveTo(-5, 9)
+      ctx.lineTo(0, 19)
+      ctx.lineTo(5, 9)
+      ctx.stroke()
+    }
+
+    ctx.restore()
+  }
 }

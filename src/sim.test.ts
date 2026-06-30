@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld, step } from './sim'
-import { bound, overlap, wrap } from './geometry'
+import { bound, overlap, wrap, wrapImages } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import type { Input, World } from './entities'
 
@@ -61,6 +61,14 @@ describe('geometry', () => {
     expect(bound(105, 50, 5, 0, 0, 100, 100, 'bounce')).toEqual({ x: 95, y: 50, vx: -5, vy: 0, dead: false })
     expect(bound(105, 50, 5, 0, 0, 100, 100, 'kill').dead).toBe(true)
     expect(bound(50, 50, 5, 0, 0, 100, 100, 'kill').dead).toBe(false) // in bounds
+  })
+
+  it('wrapImages draws a straddling entity on the opposite edge (seamless wrap)', () => {
+    expect(wrapImages(400, 300, 30, 800, 600)).toEqual([{ x: 400, y: 300 }]) // centred → one copy
+    const left = wrapImages(5, 300, 30, 800, 600) // pokes past x=0
+    expect(left).toContainEqual({ x: 5, y: 300 })
+    expect(left).toContainEqual({ x: 805, y: 300 }) // mirrored a full width to the right
+    expect(wrapImages(5, 5, 30, 800, 600)).toHaveLength(4) // a corner straddles both axes
   })
 
   it('bound reflects off the circle arena', () => {

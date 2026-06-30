@@ -74,6 +74,26 @@ export function deflect(x: number, y: number, vx: number, vy: number, r: number,
   }
 }
 
+/**
+ * The positions to draw an entity at for a seamless toroidal (wrap) arena: always its own
+ * spot, plus a copy shifted by ±width / ±height (and the corner) whenever its bounding
+ * circle (radius `r`) crosses an edge — so a shape straddling the seam shows on *both*
+ * sides instead of teleporting when its centre folds over. Returns 1, 2 or 4 positions.
+ */
+export function wrapImages(x: number, y: number, r: number, width: number, height: number): Vec2[] {
+  const xs = [x]
+  if (x - r < 0) xs.push(x + width)
+  if (x + r > width) xs.push(x - width)
+  const ys = [y]
+  if (y - r < 0) ys.push(y + height)
+  if (y + r > height) ys.push(y - height)
+  const out: Vec2[] = []
+  for (const px of xs) {
+    for (const py of ys) out.push({ x: px, y: py })
+  }
+  return out
+}
+
 /** Do two circles overlap? (squared-distance test, no sqrt.) */
 export function overlap(a: Vec2, ar: number, b: Vec2, br: number): boolean {
   const dx = a.x - b.x
