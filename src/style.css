@@ -160,6 +160,31 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+/* Custom-palette colour pickers: label on the left, a small rounded colour well on the right. */
+#panel label.colour {
+  justify-content: space-between;
+  font-size: 0.76rem;
+}
+
+#panel input[type="color"] {
+  width: 2.4rem;
+  height: 1.1rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--dim) 45%, transparent);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+#panel input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 1px;
+}
+
+#panel input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
 /* Nested sub-options (Piercing / Chain) hang off "Charged motes split" — a vertical
    dependency line + indent. The whole group dims when the parent disables them. */
 #panel .sub {

@@ -5,7 +5,7 @@ import './style.css'
 import { createWorld, step } from './sim'
 import { decodeSeed, encodeSeed } from './seed'
 import type { Config } from './config'
-import { PALETTES, draw, type Ghost, type Shard, type TrailDot } from './render'
+import { draw, paletteFor, type Ghost, type Shard, type TrailDot } from './render'
 import { createInput } from './input'
 import { createLoop } from './loop'
 import { resumeAudio, setMusic, setSfx, sfxPulse, sfxShatter } from './audio'
@@ -36,6 +36,11 @@ function radio(name: string): string | undefined {
 function num(id: string, fallback: number): number {
   const v = document.querySelector<HTMLInputElement>(id)?.valueAsNumber
   return v !== undefined && Number.isFinite(v) ? v : fallback
+}
+
+// A colour input's #rrggbb value, falling back if the control is missing.
+function colour(id: string, fallback: string): string {
+  return document.querySelector<HTMLInputElement>(id)?.value ?? fallback
 }
 
 function readPanel(): Config {
@@ -74,6 +79,9 @@ function readPanel(): Config {
     shake: checked('#opt-shake'),
     debris: checked('#opt-debris'),
     palette: palette === 'mono' || palette === 'neon' ? palette : 'copper',
+    customPalette: checked('#opt-customPalette'),
+    customBg: colour('#opt-customBg', '#0a0a0a'),
+    customFront: colour('#opt-customFront', '#d98a44'),
   }
 }
 
@@ -104,9 +112,13 @@ function writePanel(c: Config): void {
     ['#opt-conduction', c.conduction], ['#opt-chargedRepel', c.chargedRepel], ['#opt-bipolar', c.bipolar],
     ['#opt-burst', c.burst], ['#opt-stasis', c.stasis], ['#opt-well', c.well], ['#opt-friction', c.friction],
     ['#opt-moteCollision', c.moteCollision], ['#opt-flow', c.flow], ['#opt-trailMotes', c.trailMotes],
-    ['#opt-shake', c.shake], ['#opt-debris', c.debris],
+    ['#opt-shake', c.shake], ['#opt-debris', c.debris], ['#opt-customPalette', c.customPalette],
   ]
   for (const [id, on] of checks) setCheck(id, on)
+  for (const [id, v] of [['#opt-customBg', c.customBg], ['#opt-customFront', c.customFront]] as Array<[string, string]>) {
+    const el = document.querySelector<HTMLInputElement>(id)
+    if (el !== null) el.value = v
+  }
   const ranges: Array<[string, number]> = [
     ['#opt-fieldRange', c.fieldRange], ['#opt-fieldStrength', c.fieldStrength], ['#opt-chargeTime', c.chargeTime],
     ['#opt-vortexSwirl', c.vortexSwirl], ['#opt-moteCount', c.moteCount], ['#opt-moteSize', c.moteSize],
@@ -145,6 +157,9 @@ function syncEnablement(): void {
   disable('#opt-piercing', !split)
   disable('#opt-chainReaction', !split)
   disable('#opt-trailMotes', radio('trails') === 'off') // only relevant when trails are on
+  const custom = checked('#opt-customPalette')
+  disable('#opt-customBg', !custom) // colour pickers only matter with the custom palette on
+  disable('#opt-customFront', !custom)
 }
 
 // Read the music/SFX controls (separate from the sim Config — audio is output only).
@@ -158,7 +173,7 @@ function applyAudio(): void {
 // variables the panel / hint / page background read, so switching palette recolours the
 // whole app, not just the drawn world.
 function applyPalette(): void {
-  const p = PALETTES[config.palette]
+  const p = paletteFor(config) // custom colours or the named preset
   const root = document.documentElement.style
   root.setProperty('--accent', p.stroke)
   root.setProperty('--dim', p.dim)
@@ -264,6 +279,15 @@ if (panel !== null) {
     world = createWorld(currentSeed, canvas.width, canvas.height, config)
     if (e.target instanceof HTMLElement) e.target.blur()
   })
+  // Live-recolour as the custom colour pickers move (they fire 'input' during the drag; the
+  // panel listener above only catches 'change' on commit).
+  const onColour = (): void => {
+    config = readPanel()
+    applyPalette()
+    refreshSeed()
+  }
+  document.querySelector<HTMLInputElement>('#opt-customBg')?.addEventListener('input', onColour)
+  document.querySelector<HTMLInputElement>('#opt-customFront')?.addEventListener('input', onColour)
 }
 
 // SFX, screen-shake and trail particles are driven by the world each frame (the sim

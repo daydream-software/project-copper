@@ -65,8 +65,15 @@ export interface Config {
   shake: boolean
   /** Line-shard debris flung from each shatter (a view-only flourish). */
   debris: boolean
-  /** Colour theme. */
+  /** Colour theme — used when `customPalette` is off. */
   palette: 'copper' | 'mono' | 'neon'
+  /** Use the custom background + foreground colours below instead of the named palette. */
+  customPalette: boolean
+  /** Custom background colour, `#rrggbb` (only meaningful when customPalette is on; encoded
+   * into the seed only then, so non-custom seeds stay short). */
+  customBg: string
+  /** Custom foreground colour, `#rrggbb` — dim and charged tones are derived from it. */
+  customFront: string
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -101,4 +108,7 @@ export const DEFAULT_CONFIG: Config = {
   shake: false,
   debris: false,
   palette: 'copper',
+  customPalette: false,
+  customBg: '#0a0a0a',
+  customFront: '#d98a44',
 }

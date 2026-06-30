@@ -15,6 +15,7 @@ const ALL: Config = cfg({
   well: true, friction: true, moteCollision: true, flow: true,
   trails: 'full', trailMotes: false, shake: true, debris: true,
   pillarCount: 4, pillarSize: 56, palette: 'neon',
+  customPalette: true, customBg: '#123456', customFront: '#abcdef',
 })
 
 describe('settings seed', () => {
@@ -24,14 +25,21 @@ describe('settings seed', () => {
 
   it('the default config is a short seed that round-trips', () => {
     const seed = encodeSeed(DEFAULT_CONFIG)
-    expect(seed.length).toBeLessThan(20) // a handful of base36 chars, not a JSON blob
+    expect(seed.length).toBeLessThan(28) // base36 mixed-radix + the two colours, not a JSON blob
     expect(decodeSeed(seed)).toEqual(DEFAULT_CONFIG)
   })
 
-  it('rejects the wrong version or non-base36 junk', () => {
-    expect(decodeSeed('9abcdef')).toBeNull() // wrong version char
+  it('rejects the wrong tag or non-base36 junk', () => {
+    expect(decodeSeed('9abcdef')).toBeNull() // wrong tag char
     expect(decodeSeed('1 not base36 !')).toBeNull()
     expect(decodeSeed('')).toBeNull()
+  })
+
+  it('a seed shorter than the schema defaults the trailing (newer) fields', () => {
+    // An older / shorter seed lacks the high digits, so the appended fields read as 0 = default.
+    const decoded = decodeSeed('1a')
+    expect(decoded).not.toBeNull()
+    expect(decoded?.customPalette).toBe(false) // a later-appended field falls back to its default
   })
 
   it('the num-field schema matches the slider ranges in index.html (no drift)', () => {

@@ -7,7 +7,7 @@ import type { Config } from './config'
 import { axisDelta, wrapImages, type Vec2 } from './geometry'
 import type { Asteroid, FieldMode, World } from './entities'
 
-interface Palette { bg: string, stroke: string, dim: string, charged: string }
+export interface Palette { bg: string, stroke: string, dim: string, charged: string }
 
 // Exported so the DOM UI (panel, hint, page background) can theme itself to match the
 // canvas palette via CSS variables, not just the drawn world.
@@ -15,6 +15,30 @@ export const PALETTES: Record<Config['palette'], Palette> = {
   copper: { bg: '#0a0a0a', stroke: '#d98a44', dim: '#b87333', charged: '#f6c98a' },
   mono: { bg: '#0a0a0a', stroke: '#d6d6d6', dim: '#8a8a8a', charged: '#ffffff' },
   neon: { bg: '#05060d', stroke: '#36e3ff', dim: '#2487a3', charged: '#b6f5ff' },
+}
+
+// #rrggbb → [r,g,b] and a lerp between two colours (no bitwise, to keep the linter happy).
+function hexRgb(hex: string): [number, number, number] {
+  const parsed = Number.parseInt(hex.replace('#', ''), 16)
+  const n = Number.isNaN(parsed) ? 0 : parsed
+  return [Math.floor(n / 65536) % 256, Math.floor(n / 256) % 256, n % 256]
+}
+function mix(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = hexRgb(a)
+  const [br, bg, bb] = hexRgb(b)
+  const c = (x: number, y: number): number => Math.round(x + (y - x) * t)
+  return `#${(c(ar, br) * 65536 + c(ag, bg) * 256 + c(ab, bb)).toString(16).padStart(6, '0')}`
+}
+
+// A full palette from just a background + foreground colour: dim is the foreground pulled
+// toward the background, charged is it pulled toward white.
+export function makePalette(bg: string, front: string): Palette {
+  return { bg, stroke: front, dim: mix(front, bg, 0.4), charged: mix(front, '#ffffff', 0.5) }
+}
+
+// The palette in effect for a config — the custom one, or the named preset.
+export function paletteFor(config: Config): Palette {
+  return config.customPalette ? makePalette(config.customBg, config.customFront) : PALETTES[config.palette]
 }
 
 const PULSE_FLASH = 0.35 // seconds the gather-pulse ripple stays visible
@@ -32,7 +56,7 @@ let active: Palette = PALETTES.copper
 let showPolarity = false // draw +/- marks on charged motes (bipolar mode)
 
 export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config, grains: TrailDot[], ghosts: Ghost[], shards: Shard[]): void {
-  active = PALETTES[config.palette]
+  active = paletteFor(config)
   showPolarity = config.bipolar
   ctx.fillStyle = active.bg // full opaque clear — no fade residue ever
   ctx.fillRect(0, 0, world.width, world.height)
