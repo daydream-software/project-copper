@@ -453,6 +453,7 @@ describe('wrapped-edge collisions (toroidal distance)', () => {
   it('a charged mote shatters one across the seam in wrap mode', () => {
     const wrapped = step(makeWorld({ width: 800, height: 600, asteroids: seamPair(2, 0) }), NONE, DT, cfg({ edges: 'wrap' }))
     expect(wrapped.asteroids.filter((a) => a.radius < 25).length).toBeGreaterThanOrEqual(4) // both shatter across the seam
+    expect(wrapped.shatters.length).toBeGreaterThan(0) // seam shatter still feeds debris (the shatter source fires)
     const bounced = step(makeWorld({ width: 800, height: 600, asteroids: seamPair(2, 0) }), NONE, DT, cfg({ edges: 'bounce' }))
     expect(bounced.asteroids.filter((a) => a.radius < 25)).toHaveLength(0) // no seam → 790px apart → no contact
   })
