@@ -4,6 +4,7 @@
 
 import { FIELD_RANGE, PULSE_RANGE } from './sim'
 import type { Config } from './config'
+import type { Vec2 } from './geometry'
 import type { FieldMode, World } from './entities'
 
 interface Palette { bg: string, stroke: string, dim: string, charged: string }
@@ -16,21 +17,26 @@ const PALETTES: Record<Config['palette'], Palette> = {
 
 const PULSE_FLASH = 0.35 // seconds the gather-pulse ripple stays visible
 
-// A trail particle — owned and aged by main; drawn here as a fading dot. The canvas is
-// fully cleared each frame, so trails leave NO residue in the background.
+// Trail particles — owned and aged by main, drawn here. The canvas is fully cleared each
+// frame and dead particles are dropped, so trails leave NO residue. `TrailDot` is a dust
+// grain; `Ghost` is a faded snapshot of an entity's outline (the full trail).
 export interface TrailDot { x: number, y: number, life: number, max: number, r: number, a: number }
+export interface Ghost { x: number, y: number, angle: number, radius: number, shape: Vec2[], ship: boolean, life: number, max: number }
 
 // The active palette for this frame — set at the top of draw(), read by the helpers.
 let active: Palette = PALETTES.copper
 
-export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config, trail: TrailDot[]): void {
+export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config, grains: TrailDot[], ghosts: Ghost[]): void {
   active = PALETTES[config.palette]
-  ctx.fillStyle = active.bg // full opaque clear — no fade residue
+  ctx.fillStyle = active.bg // full opaque clear — no fade residue ever
   ctx.fillRect(0, 0, world.width, world.height)
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 
-  drawTrail(ctx, trail)
+  // Trails (drawn under the crisp world): full = faded shape outlines; dust = grains.
+  if (config.trails === 'full') drawGhosts(ctx, ghosts)
+  else if (config.trails === 'dust') drawGrains(ctx, grains)
+
   drawField(ctx, world)
   drawAsteroids(ctx, world)
   drawBullets(ctx, world)
@@ -38,15 +44,42 @@ export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config
   drawPulse(ctx, world)
 }
 
-// Trail particles: faded dots under the world. dust = sparse small grains, full = a
-// dense streak (main decides the spawn pattern); each dot fades out by life/max.
-function drawTrail(ctx: CanvasRenderingContext2D, trail: TrailDot[]): void {
+// Dust grains: sparse fading dots (main decides the spawn pattern).
+function drawGrains(ctx: CanvasRenderingContext2D, grains: TrailDot[]): void {
   ctx.fillStyle = active.stroke
-  for (const p of trail) {
+  for (const p of grains) {
     ctx.globalAlpha = (p.life / p.max) * p.a
     ctx.beginPath()
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
     ctx.fill()
+  }
+  ctx.globalAlpha = 1
+}
+
+// Full trail: faded outline snapshots of each entity — its actual shape, ebbing away.
+function drawGhosts(ctx: CanvasRenderingContext2D, ghosts: Ghost[]): void {
+  ctx.strokeStyle = active.stroke
+  ctx.lineWidth = 2
+  for (const g of ghosts) {
+    ctx.globalAlpha = (g.life / g.max) * 0.5
+    ctx.save()
+    ctx.translate(g.x, g.y)
+    ctx.rotate(g.angle)
+    ctx.beginPath()
+    if (g.ship) {
+      ctx.moveTo(0, -16)
+      ctx.lineTo(11, 12)
+      ctx.lineTo(0, 6)
+      ctx.lineTo(-11, 12)
+    } else {
+      for (const [i, v] of g.shape.entries()) {
+        if (i === 0) ctx.moveTo(v.x * g.radius, v.y * g.radius)
+        else ctx.lineTo(v.x * g.radius, v.y * g.radius)
+      }
+    }
+    ctx.closePath()
+    ctx.stroke()
+    ctx.restore()
   }
   ctx.globalAlpha = 1
 }

@@ -4,7 +4,7 @@
 import './style.css'
 import { createWorld, step } from './sim'
 import type { Config } from './config'
-import { draw, type TrailDot } from './render'
+import { draw, type Ghost, type TrailDot } from './render'
 import { createInput } from './input'
 import { createLoop } from './loop'
 import { resumeAudio, setMusic, setSfx, sfxPulse, sfxShatter } from './audio'
@@ -121,34 +121,37 @@ if (panel !== null) {
 let prevPulseT = world.ship.pulseT
 let prevCount = world.asteroids.length
 let shake = 0 // current screen-shake magnitude, px
-let trail: TrailDot[] = []
-const TRAIL_MAX = 3500 // particle cap
+// Trails as particles that are fully dropped when they die → no residue ever. Dust =
+// grains (dots); full = ghosts (faded snapshots of each entity's outline).
+let grains: TrailDot[] = []
+let ghosts: Ghost[] = []
+const GRAIN_MAX = 1200
+const GHOST_LIFE = 28
+const GHOST_MAX = 1800
 
-// Drop a trail particle at a point. dust = sparse, small, faint, short-lived grains;
-// full = a dense longer-lived streak.
-function dropTrail(x: number, y: number, dust: boolean): void {
-  if (dust && Math.random() > 0.55) return
-  const jitter = dust ? 4 : 0
-  const life = dust ? 14 : 42
-  trail.push({
-    x: x + (Math.random() * 2 - 1) * jitter,
-    y: y + (Math.random() * 2 - 1) * jitter,
-    life,
-    max: life,
-    r: dust ? 1 : 1.6,
-    a: dust ? 0.45 : 0.8,
-  })
+// Drop a dust grain near a point: small, jittered, faint, short-lived.
+function dropGrain(x: number, y: number): void {
+  if (Math.random() > 0.55) return
+  grains.push({ x: x + (Math.random() * 2 - 1) * 4, y: y + (Math.random() * 2 - 1) * 4, life: 14, max: 14, r: 1, a: 0.45 })
 }
 
 function stepTrail(): void {
-  if (config.trails !== 'off') {
-    const dust = config.trails === 'dust'
-    dropTrail(world.ship.pos.x, world.ship.pos.y, dust)
-    for (const m of world.asteroids) dropTrail(m.pos.x, m.pos.y, dust)
+  if (config.trails === 'dust') {
+    dropGrain(world.ship.pos.x, world.ship.pos.y)
+    for (const m of world.asteroids) dropGrain(m.pos.x, m.pos.y)
+  } else if (config.trails === 'full') {
+    const s = world.ship
+    ghosts.push({ x: s.pos.x, y: s.pos.y, angle: s.angle, radius: 0, shape: [], ship: true, life: GHOST_LIFE, max: GHOST_LIFE })
+    for (const m of world.asteroids) {
+      ghosts.push({ x: m.pos.x, y: m.pos.y, angle: m.angle, radius: m.radius, shape: m.shape, ship: false, life: GHOST_LIFE, max: GHOST_LIFE })
+    }
   }
-  for (const p of trail) p.life -= 1
-  trail = trail.filter((p) => p.life > 0)
-  if (trail.length > TRAIL_MAX) trail = trail.slice(-TRAIL_MAX)
+  for (const p of grains) p.life -= 1
+  grains = grains.filter((p) => p.life > 0)
+  if (grains.length > GRAIN_MAX) grains = grains.slice(-GRAIN_MAX)
+  for (const g of ghosts) g.life -= 1
+  ghosts = ghosts.filter((g) => g.life > 0)
+  if (ghosts.length > GHOST_MAX) ghosts = ghosts.slice(-GHOST_MAX)
 }
 
 const loop = createLoop(
@@ -160,7 +163,7 @@ const loop = createLoop(
   },
   () => {
     stepTrail()
-    draw(ctx, world, config, trail)
+    draw(ctx, world, config, grains, ghosts)
     const grew = world.asteroids.length > prevCount // motes split (heuristic: count grew)
     if (world.ship.pulseT < 0.05 && prevPulseT > 0.1) sfxPulse()
     if (grew) sfxShatter()
