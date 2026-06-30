@@ -102,6 +102,46 @@ export function overlap(a: Vec2, ar: number, b: Vec2, br: number): boolean {
   return dx * dx + dy * dy < r * r
 }
 
+/** The oriented-outline subset of a mote that shape-aware contact needs. */
+export interface Outline { pos: Vec2, radius: number, angle: number, shape: Vec2[] }
+
+/**
+ * How far a convex blob's outline reaches from its centre toward world direction (ux,uy).
+ * The shape is unit vertices evenly spaced in local angle (see makeShape); rotate the
+ * direction into the shape's frame and linearly interpolate the two straddling vertices'
+ * magnitudes, then scale by `radius`. A shapeless mote (no vertices — the unit-test
+ * stand-ins) falls back to its bounding `radius`. Interpolating vertex magnitudes (rather
+ * than intersecting the exact edge) keeps it cheap; its chord-vs-arc error is a few percent,
+ * well under the line-of-centres approximation the contact test already makes.
+ */
+export function outlineRadius(shape: Vec2[], radius: number, angle: number, ux: number, uy: number): number {
+  const n = shape.length
+  if (n === 0) return radius
+  const tau = Math.PI * 2
+  const phi = (((Math.atan2(uy, ux) - angle) % tau) + tau) % tau // direction in the shape's frame, [0, tau)
+  const step = tau / n
+  const k = Math.floor(phi / step)
+  const frac = phi / step - k
+  const mk = Math.hypot(shape[k].x, shape[k].y)
+  const mk1 = Math.hypot(shape[(k + 1) % n].x, shape[(k + 1) % n].y)
+  return (mk + (mk1 - mk) * frac) * radius
+}
+
+/**
+ * Shape-aware contact: two oriented blobs touch when the gap between centres is less than
+ * the sum of each outline's reach toward the other — so a hit follows the drawn polygon,
+ * not its (larger) bounding circle. Coincident centres count as in contact.
+ */
+export function outlinesTouch(a: Outline, b: Outline): boolean {
+  const dx = b.pos.x - a.pos.x
+  const dy = b.pos.y - a.pos.y
+  const d = Math.hypot(dx, dy)
+  if (d <= 0) return true
+  const ra = outlineRadius(a.shape, a.radius, a.angle, dx / d, dy / d)
+  const rb = outlineRadius(b.shape, b.radius, b.angle, -dx / d, -dy / d)
+  return d < ra + rb
+}
+
 /**
  * A convex-ish blob of `points` unit vertices (magnitude ~0.7–1.0), evenly spaced
  * around the circle with a seeded radial jitter. The renderer scales these by the

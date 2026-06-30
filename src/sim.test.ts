@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld, step } from './sim'
-import { bound, overlap, wrap, wrapImages } from './geometry'
+import { bound, outlineRadius, overlap, wrap, wrapImages } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import type { Input, World } from './entities'
 
@@ -18,6 +18,13 @@ const mote = (x: number, vx: number) => ({ pos: { x, y: 300 }, vel: { x: vx, y: 
 
 // A mote at a fixed spot with a given radius and charge, for collision tests.
 const moteAt = (x: number, y: number, radius: number, charge: number) => ({ pos: { x, y }, vel: { x: 0, y: 0 }, radius, angle: 0, spin: 0, shape: [], charge })
+
+// A regular octagon shape at a fixed magnitude (unit vertices) — a known outline for
+// shape-aware contact tests, where makeShape's randomness can't give a precise threshold.
+const ring = (mag: number) => [...Array(8).keys()].map((i) => {
+  const a = (i / 8) * Math.PI * 2
+  return { x: Math.cos(a) * mag, y: Math.sin(a) * mag }
+})
 
 // Run the sim n fixed steps under a held input.
 function stepN(w: World, input: Input, n: number): World {
@@ -69,6 +76,13 @@ describe('geometry', () => {
     expect(left).toContainEqual({ x: 5, y: 300 })
     expect(left).toContainEqual({ x: 805, y: 300 }) // mirrored a full width to the right
     expect(wrapImages(5, 5, 30, 800, 600)).toHaveLength(4) // a corner straddles both axes
+  })
+
+  it('outlineRadius follows the shape, not the bounding circle', () => {
+    const blob = ring(0.7) // a regular octagon at 0.7 of the radius
+    expect(outlineRadius(blob, 30, 0, 1, 0)).toBeCloseTo(21) // 0.7 × 30 toward +x
+    expect(outlineRadius(blob, 30, Math.PI / 3, 0, -1)).toBeCloseTo(21) // uniform → rotation-invariant
+    expect(outlineRadius([], 30, 0, 1, 0)).toBe(30) // shapeless → bounding circle
   })
 
   it('bound reflects off the circle arena', () => {
@@ -226,6 +240,18 @@ describe('charged-mote collisions', () => {
   it('two uncharged motes do not split each other', () => {
     const w = step(makeWorld({ asteroids: [moteAt(300, 300, 48, 0), moteAt(300, 300, 48, 0)] }), NONE, DT)
     expect(w.asteroids.filter((a) => a.radius < 40)).toHaveLength(0)
+  })
+
+  it('a charged hit follows the mote outline, not its bounding circle', () => {
+    // Two r=30 motes whose outlines sit at 0.7 of the radius (reach 21 each, sum 42).
+    const blob = ring(0.7)
+    const cm = (x: number, charge: number) => ({ pos: { x, y: 300 }, vel: { x: 0, y: 0 }, radius: 30, angle: 0, spin: 0, shape: blob, charge })
+    // Centres 50 apart: bounding circles (sum 60) overlap, but the outlines (sum 42) don't.
+    const apart = step(makeWorld({ asteroids: [cm(300, 2), cm(350, 0)] }), NONE, DT)
+    expect(apart.asteroids.filter((a) => a.radius < 25)).toHaveLength(0) // no premature shatter
+    // Centres 40 apart: outlines (sum 42) overlap → both shatter into fragments.
+    const close = step(makeWorld({ asteroids: [cm(300, 2), cm(340, 0)] }), NONE, DT)
+    expect(close.asteroids.filter((a) => a.radius < 25).length).toBeGreaterThanOrEqual(4)
   })
 })
 

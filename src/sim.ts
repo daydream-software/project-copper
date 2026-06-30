@@ -3,7 +3,7 @@
 // (rng.ts) for all randomness, so a run is reproducible and directly unit-testable.
 
 import { makeRng, random, range, type Rng } from './rng'
-import { bound, deflect, makeShape, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
+import { bound, deflect, makeShape, outlinesTouch, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import type { Asteroid, Bullet, FieldMode, Input, Pillar, Ship, World } from './entities'
 
@@ -417,7 +417,7 @@ function findMoteSplits(motes: Asteroid[]): { targets: Set<number>, chargers: Se
     for (const [j, mj] of motes.entries()) {
       if (i === j) continue
       if (mj.charge > 0) continue
-      if (!overlap(mi.pos, mi.radius, mj.pos, mj.radius)) continue
+      if (!outlinesTouch(mi, mj)) continue // contact follows the drawn outline, not the bounding circle
       targets.add(j)
       chargers.add(i)
     }
