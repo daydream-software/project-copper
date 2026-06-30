@@ -2,6 +2,26 @@ import { describe, expect, it } from 'vitest'
 import { createWorld, step } from './sim'
 import { DT, NONE, cfg, makeWorld, mote, press, ring } from './test-helpers'
 
+describe('merged pair-force (charged repel + bipolar)', () => {
+  const charged = (x: number, pol: number) => ({ pos: { x, y: 300 }, vel: { x: 0, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 2, polarity: pol })
+
+  it('charged repel and bipolar stack when both are on', () => {
+    // Two like-pole charged motes: repel pushes apart, bipolar (like) also pushes apart, so
+    // both-on shoves the left mote further left than repel alone (the merged function runs twice).
+    const both = step(makeWorld({ asteroids: [charged(300, 1), charged(340, 1)] }), NONE, DT, cfg({ chargedRepel: true, bipolar: true }))
+    const repelOnly = step(makeWorld({ asteroids: [charged(300, 1), charged(340, 1)] }), NONE, DT, cfg({ chargedRepel: true }))
+    expect(both.asteroids[0].vel.x).toBeLessThan(repelOnly.asteroids[0].vel.x)
+  })
+
+  it('charged repel reaches across the wrap seam', () => {
+    // Motes at x=790 and x=10 — 20px apart across the seam, within CHARGED_REPEL_RANGE (95).
+    const wrapped = step(makeWorld({ width: 800, height: 600, asteroids: [charged(790, 1), charged(10, 1)] }), NONE, DT, cfg({ chargedRepel: true, edges: 'wrap' }))
+    expect(wrapped.asteroids[0].vel.x).toBeLessThan(0) // pushed away from the mote across the seam
+    const open = step(makeWorld({ width: 800, height: 600, asteroids: [charged(790, 1), charged(10, 1)] }), NONE, DT, cfg({ chargedRepel: true, edges: 'bounce' }))
+    expect(open.asteroids[0].vel.x).toBe(0) // 780px apart raw → out of range
+  })
+})
+
 describe('pillars', () => {
   it('createWorld spawns config.pillarCount pillars at config.pillarSize (none by default)', () => {
     expect(createWorld(7, 720, 720).pillars).toHaveLength(0) // off by default
