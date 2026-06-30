@@ -71,10 +71,17 @@ audio-on-refresh gap is closed too: a music track the browser restores now start
 first user gesture (`onFirstGesture` re-applies the panel), so the panel matches what
 plays.
 
+### Slice M3 — mode pack: physics (done)
+
+**Mote collisions** (motes bounce off each other — billiards; elastic, mass ∝ radius²,
+`resolveMoteBounce`) and a **flow field** (a static swirl that pushes motes like
+currents, in `stepMote`). Plus a **trail-motes** option: trails can apply to the ship
+only, or ship + motes (nested under Trails, disabled when trails are off). `step()`'s
+post-movement passes were factored into `reactMotes` to keep it flat.
+
 ## Next — the open ladder (more mode packs)
 
 - **Pack: more charge** — bipolar +/- charge, overcharge→burst, stasis.
-- **Pack: physics** — mote↔mote elastic collisions, flow field.
 - **Pack: arena** — circular arena, obstacles/walls, kill-edges.
 - **Pack: ship & juice** — ship collision (bounce, no game-over), dash, magnetic hull,
   debris particles on shatter (needs shatter positions from the sim).

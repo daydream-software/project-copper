@@ -54,6 +54,9 @@ const MOTE_DRAG = 0.5 // friction: fraction of mote velocity shed per second (sa
 const CHARGED_REPEL_RANGE = 95 // reach of charged-mote mutual repulsion, px
 const CHARGED_REPEL_STRENGTH = 700 // charged-mote mutual repulsion at the centre, px/s^2
 const CONDUCTION_RANGE = 130 // a charged mote energizes uncharged motes within this, px
+const MOTE_RESTITUTION = 0.85 // bounciness of mote↔mote elastic collisions (sandbox toggle)
+const FLOW_SCALE = 0.012 // flow-field spatial frequency, 1/px (sandbox toggle)
+const FLOW_FORCE = 120 // flow-field push, px/s^2
 
 // Charge lasts longer on bigger motes (proportional to radius): a base-size mote holds
 // MOTE_CHARGE_TIME, a small fragment proportionally less.
@@ -229,6 +232,11 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
     vx += (width / 2 - a.pos.x) * WELL_K * dt
     vy += (height / 2 - a.pos.y) * WELL_K * dt
   }
+  if (config.flow) {
+    // A static swirl field: motes drift along it like currents.
+    vx += Math.cos(a.pos.y * FLOW_SCALE) * FLOW_FORCE * dt
+    vy += Math.sin(a.pos.x * FLOW_SCALE) * FLOW_FORCE * dt
+  }
   if (config.friction) {
     const drag = Math.max(0, 1 - MOTE_DRAG * dt)
     vx *= drag
@@ -270,6 +278,45 @@ function applyChargedRepel(motes: Asteroid[], dt: number): Asteroid[] {
     }
     return { ...m, vel: { x: vx, y: vy } }
   })
+}
+
+// Mote↔mote elastic collisions (sandbox toggle): motes bounce off each other (billiards)
+// instead of passing through. Each overlapping pair is separated and exchanges momentum
+// along the contact normal (mass ∝ radius²). O(n²) over the small field; works on local
+// position/velocity arrays so it never mutates the input motes.
+function resolveMoteBounce(motes: Asteroid[]): Asteroid[] {
+  const px = motes.map((m) => m.pos.x)
+  const py = motes.map((m) => m.pos.y)
+  const vx = motes.map((m) => m.vel.x)
+  const vy = motes.map((m) => m.vel.y)
+  for (let i = 0; i < motes.length; i += 1) {
+    for (let j = i + 1; j < motes.length; j += 1) {
+      const dx = px[j] - px[i]
+      const dy = py[j] - py[i]
+      const rsum = motes[i].radius + motes[j].radius
+      const d2 = dx * dx + dy * dy
+      if (d2 <= 0 || d2 >= rsum * rsum) continue
+      const d = Math.sqrt(d2)
+      const nx = dx / d
+      const ny = dy / d
+      const ma = motes[i].radius * motes[i].radius
+      const mb = motes[j].radius * motes[j].radius
+      const mt = ma + mb
+      const overlap = rsum - d
+      px[i] -= nx * overlap * (mb / mt)
+      py[i] -= ny * overlap * (mb / mt)
+      px[j] += nx * overlap * (ma / mt)
+      py[j] += ny * overlap * (ma / mt)
+      const vn = (vx[j] - vx[i]) * nx + (vy[j] - vy[i]) * ny
+      if (vn > 0) continue
+      const imp = (-(1 + MOTE_RESTITUTION) * vn) / (1 / ma + 1 / mb)
+      vx[i] -= (imp / ma) * nx
+      vy[i] -= (imp / ma) * ny
+      vx[j] += (imp / mb) * nx
+      vy[j] += (imp / mb) * ny
+    }
+  }
+  return motes.map((m, i) => ({ ...m, pos: { x: px[i], y: py[i] }, vel: { x: vx[i], y: vy[i] } }))
 }
 
 // Conduction (sandbox toggle): an uncharged mote within CONDUCTION_RANGE of any charged
@@ -382,6 +429,17 @@ function resolveCollisions(rng: Rng, bullets: Bullet[], asteroids: Asteroid[]): 
   }
 }
 
+// The post-movement mote passes, gated by config: charged repel, mote↔mote bounce,
+// charged-split, (dormant) bullet hits, then conduction.
+function reactMotes(rng: Rng, motes: Asteroid[], bullets: Bullet[], config: Config, dt: number): { asteroids: Asteroid[], bullets: Bullet[] } {
+  const repelled = config.chargedRepel ? applyChargedRepel(motes, dt) : motes
+  const bounced = config.moteCollision ? resolveMoteBounce(repelled) : repelled
+  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, bounced, config) : bounced
+  const hit = resolveCollisions(rng, bullets, reacted)
+  const conducted = config.conduction ? applyConduction(hit.asteroids) : hit.asteroids
+  return { asteroids: conducted, bullets: hit.bullets }
+}
+
 /** Advance the world one fixed timestep. Pure: returns a new world. `config` selects
  * sandbox behaviour; it defaults to the shipped behaviour so existing callers are
  * unaffected. */
@@ -396,19 +454,14 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
   const bullets = firing ? [...flying, makeBullet(ship, world.width, world.height)] : flying
   const armed: Ship = firing ? { ...ship, fireCooldown: FIRE_COOLDOWN } : ship
 
-  // A gather pulse yanks motes inward first (a one-shot velocity kick), then the
-  // continuous field + drift + spin + wrap, then charged↔uncharged mote splits, and
-  // finally any bullet hits.
+  // A gather pulse yanks motes inward first, then the continuous field + drift + wrap,
+  // then the post-movement passes (repel / bounce / split / bullet hits / conduction).
   const kicked = input.pulse ? world.asteroids.map((a) => pulseKick(a, ship.pos)) : world.asteroids
   const moved: Asteroid[] = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, config))
-  const repelled = config.chargedRepel ? applyChargedRepel(moved, dt) : moved
-  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, repelled, config) : repelled
-  const hit = resolveCollisions(rng, bullets, reacted)
-  // Conduction runs last, alongside everything: it spreads charge through nearby motes.
-  const conducted = config.conduction ? applyConduction(hit.asteroids) : hit.asteroids
+  const reacted = reactMotes(rng, moved, bullets, config, dt)
 
   // Keep the field populated (no game-over yet: it's a sandbox).
-  const deficit = Math.max(0, TARGET_ASTEROIDS - conducted.length)
+  const deficit = Math.max(0, TARGET_ASTEROIDS - reacted.asteroids.length)
   const refill = [...Array(deficit).keys()].map(() =>
     spawnAsteroid(rng, world.width, world.height, ASTEROID_BASE_RADIUS, armed.pos),
   )
@@ -417,8 +470,8 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
     width: world.width,
     height: world.height,
     ship: armed,
-    bullets: hit.bullets,
-    asteroids: [...conducted, ...refill],
+    bullets: reacted.bullets,
+    asteroids: [...reacted.asteroids, ...refill],
     rngState: rng.s,
     t: world.t + dt,
   }

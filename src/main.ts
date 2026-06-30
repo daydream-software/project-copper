@@ -48,7 +48,10 @@ function readPanel(): Config {
     chargedRepel: checked('#opt-chargedRepel'),
     well: checked('#opt-well'),
     friction: checked('#opt-friction'),
+    moteCollision: checked('#opt-moteCollision'),
+    flow: checked('#opt-flow'),
     trails: trails === 'dust' || trails === 'full' ? trails : 'off',
+    trailMotes: checked('#opt-trailMotes'),
     shake: checked('#opt-shake'),
     palette: palette === 'mono' || palette === 'neon' ? palette : 'copper',
   }
@@ -62,12 +65,16 @@ let config: Config = readPanel()
 
 // Piercing / chain reaction only matter when charged motes split, so disable them
 // (the panel dims the nested group) when that's off.
+function disable(id: string, off: boolean): void {
+  const el = document.querySelector<HTMLInputElement>(id)
+  if (el !== null) el.disabled = off
+}
+
 function syncEnablement(): void {
-  const on = checked('#opt-chargedSplit')
-  for (const id of ['#opt-piercing', '#opt-chainReaction']) {
-    const el = document.querySelector<HTMLInputElement>(id)
-    if (el !== null) el.disabled = !on
-  }
+  const split = checked('#opt-chargedSplit')
+  disable('#opt-piercing', !split)
+  disable('#opt-chainReaction', !split)
+  disable('#opt-trailMotes', radio('trails') === 'off') // only relevant when trails are on
 }
 
 // Read the music/SFX controls (separate from the sim Config — audio is output only).
@@ -135,17 +142,23 @@ function dropGrain(x: number, y: number): void {
   grains.push({ x: x + (Math.random() * 2 - 1) * 4, y: y + (Math.random() * 2 - 1) * 4, life: 14, max: 14, r: 1, a: 0.45 })
 }
 
-function stepTrail(): void {
+function spawnTrail(): void {
   if (config.trails === 'dust') {
     dropGrain(world.ship.pos.x, world.ship.pos.y)
-    for (const m of world.asteroids) dropGrain(m.pos.x, m.pos.y)
+    if (config.trailMotes) for (const m of world.asteroids) dropGrain(m.pos.x, m.pos.y)
   } else if (config.trails === 'full') {
     const s = world.ship
     ghosts.push({ x: s.pos.x, y: s.pos.y, angle: s.angle, radius: 0, shape: [], ship: true, life: GHOST_LIFE, max: GHOST_LIFE })
-    for (const m of world.asteroids) {
-      ghosts.push({ x: m.pos.x, y: m.pos.y, angle: m.angle, radius: m.radius, shape: m.shape, ship: false, life: GHOST_LIFE, max: GHOST_LIFE })
+    if (config.trailMotes) {
+      for (const m of world.asteroids) {
+        ghosts.push({ x: m.pos.x, y: m.pos.y, angle: m.angle, radius: m.radius, shape: m.shape, ship: false, life: GHOST_LIFE, max: GHOST_LIFE })
+      }
     }
   }
+}
+
+function stepTrail(): void {
+  spawnTrail()
   for (const p of grains) p.life -= 1
   grains = grains.filter((p) => p.life > 0)
   if (grains.length > GRAIN_MAX) grains = grains.slice(-GRAIN_MAX)

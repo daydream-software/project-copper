@@ -28,8 +28,14 @@ export interface Config {
   well: boolean
   /** Motes lose speed over time (drag). */
   friction: boolean
-  /** Motion trails: `off`, a faint `dust`, or long `full` streaks. */
+  /** Motes bounce off each other (billiards) instead of passing through. */
+  moteCollision: boolean
+  /** A static swirl field pushes the motes like currents. */
+  flow: boolean
+  /** Motion trails: `off`, a faint `dust`, or `full` shape outlines. */
   trails: 'dust' | 'full' | 'off'
+  /** Whether the motes trail too (off = only the ship trails). */
+  trailMotes: boolean
   /** Screen-shake on shatters. */
   shake: boolean
   /** Colour theme. */
@@ -49,7 +55,10 @@ export const DEFAULT_CONFIG: Config = {
   chargedRepel: false,
   well: false,
   friction: false,
+  moteCollision: false,
+  flow: false,
   trails: 'off',
+  trailMotes: true,
   shake: false,
   palette: 'copper',
 }

@@ -265,6 +265,19 @@ describe('physics & charge modes', () => {
     expect(w.asteroids[0].vel.x).toBeGreaterThan(0)
     expect(w.asteroids[0].vel.x).toBeLessThan(200)
   })
+
+  it('mote collisions bounce two motes off each other (billiards)', () => {
+    const a = { pos: { x: 300, y: 300 }, vel: { x: 100, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 0 }
+    const b = { pos: { x: 340, y: 300 }, vel: { x: -100, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 0 }
+    const w = step(makeWorld({ asteroids: [a, b] }), NONE, DT, cfg({ moteCollision: true }))
+    expect(w.asteroids[0].vel.x).toBeLessThan(0) // head-on → both reverse
+    expect(w.asteroids[1].vel.x).toBeGreaterThan(0)
+  })
+
+  it('the flow field pushes a still mote', () => {
+    const w = step(makeWorld({ asteroids: [moteAt(300, 300, 30, 0)] }), NONE, DT, cfg({ flow: true }))
+    expect(Math.hypot(w.asteroids[0].vel.x, w.asteroids[0].vel.y)).toBeGreaterThan(0)
+  })
 })
 
 describe('edges mode', () => {
