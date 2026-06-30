@@ -116,12 +116,53 @@ readout. UI fixes alongside: the controls **hint moved to the bottom-right** (th
 top-left panel was covering it) and the **panel now scrolls** (`max-height` + `overflow-y`)
 so Reseed/SFX stay reachable as it grows.
 
+### Slice L — field knobs (done)
+
+The knobs reach the **core verb**: a **Field** panel group tunes the continuous field
+(attract / scatter / vortex) — **Range**, **Strength**, **Charge** (vortex wind-up) and
+**Swirl** (the full-charge fling speed) — backed by `fieldRange` / `fieldStrength` /
+`chargeTime` / `vortexSwirl` in `Config` (defaulting to the shipped 260 / 1100 / 1.4 / 640).
+These are **live** knobs, not generation knobs: the loop reads `config` each frame, so they
+take effect immediately and stay **out of `genChanged`** (no rebuild). The view reads
+`config.fieldRange` for the tethers + reach ring; the old `FIELD_RANGE` export and the
+`FIELD_STRENGTH` / `VORTEX_RADIUS` / `VORTEX_SWIRL_MAX` / `CHARGE_TIME` constants are gone
+(the vortex shell radius derives from `config.fieldRange * 0.5`). Each knob has a
+discriminating test.
+
+### Slice O — arena pillars (done)
+
+A **Pillars** group (Count 0–6, default 0 = off; Size) places static disc obstacles the
+motes **and the ship** bounce off. New `Pillar` entity on `World`; a geometry `deflect()`
+pushes a moving circle out of a solid disc and reflects only the inward normal component
+(the inverse of the circle arena, which *contains*). `stepMote` / `stepShip` fold `deflect`
+over `world.pillars` after the arena `bound`; pillars carry through `step` unchanged.
+Placement is **edges-agnostic polar** — each pillar sits in an annulus of the inscribed
+disc clearing the centred ship and all four walls (margin = one mote radius) — so it stays
+valid when the arena toggles **live** to circle (edges isn't a generation knob) and never
+pins a mote against the rim. Count/Size are generation knobs (in `genChanged`); pillars
+draw from the rng *after* the asteroids and only when present, so an existing seed's field
+is unchanged with pillars off. Tests: spawn count/size, ship-clearance + arena-containment,
+mote bounce, ship bounce.
+
+### Slice J — debris on shatter (done)
+
+A **Debris** toggle (view-only, default off like the other juice toggles) flings short
+bright line **shards** from every mote shatter. The sim now surfaces shatter centres on
+`World.shatters` (the same centres `burst` already collects in `resolveMoteCollisions`),
+instead of the renderer guessing from the count-grew heuristic. `main.ts` spawns shards
+**per fixed step** from `world.shatters` (not in the render callback), so a shatter in a
+caught-up sub-step is never overwritten before it's drawn; `render.ts` ages + draws them
+(a view-only `Shard`; main carries px/frame velocity on a local superset).
+
 ## Next — the open ladder (more mode packs)
 
-- **More knobs** — sliders for field range / strength / charge time / vortex bias.
-- **Arena extra** — static obstacles/pillars to bounce off.
-- **Pack: ship & juice** — ship collision (bounce, no game-over), dash, magnetic hull,
-  debris particles on shatter (needs shatter positions from the sim).
+- **More field knobs** — pulse range / strength, conduction & burst radii, mote restitution.
+- **Arena extra** — pillar variety (polarity-charged pillars, moving/rotating obstacles).
+- **Pack: ship & juice** — ship × **mote** collision (bounce, no game-over), dash, magnetic
+  hull. (Ship × pillar bounce and shatter debris already landed in Slices O / J.)
+- **Refactor watch** — `sim.ts` is at the `max-lines` ceiling (450); before the next sim
+  feature, lift shared constants (e.g. `SHIP_RADIUS`) into a small module and split out the
+  pillar code, so growth stops fighting the linter.
 
 ### Older notes
 
