@@ -5,7 +5,7 @@ import './style.css'
 import { createWorld, step } from './sim'
 import { decodeSeed, encodeSeed } from './seed'
 import type { Config } from './config'
-import { draw, type Ghost, type Shard, type TrailDot } from './render'
+import { PALETTES, draw, type Ghost, type Shard, type TrailDot } from './render'
 import { createInput } from './input'
 import { createLoop } from './loop'
 import { resumeAudio, setMusic, setSfx, sfxPulse, sfxShatter } from './audio'
@@ -154,6 +154,17 @@ function applyAudio(): void {
   setSfx(checked('#opt-sfx'))
 }
 
+// Theme the DOM UI to the active palette: push the canvas palette's colours onto the CSS
+// variables the panel / hint / page background read, so switching palette recolours the
+// whole app, not just the drawn world.
+function applyPalette(): void {
+  const p = PALETTES[config.palette]
+  const root = document.documentElement.style
+  root.setProperty('--accent', p.stroke)
+  root.setProperty('--dim', p.dim)
+  root.setProperty('--bg', p.bg)
+}
+
 // In circle mode, clip the canvas itself to a circle so the arena *is* the circle
 // (the rectangular corners/margins are hidden), not a circle drawn inside a rectangle.
 function applyArenaShape(): void {
@@ -197,6 +208,7 @@ updateHint()
 syncEnablement()
 applyAudio()
 applyArenaShape()
+applyPalette()
 
 // Live-update each slider's value readout (the <output> next to it) as it moves.
 for (const r of document.querySelectorAll<HTMLInputElement>('#panel input[type="range"]')) {
@@ -227,6 +239,7 @@ if (panel !== null) {
     syncEnablement()
     applyAudio()
     applyArenaShape()
+    applyPalette()
     // Blur the control so the next space/shift goes to the game, not the checkbox.
     if (e.target instanceof HTMLElement) e.target.blur()
   })
@@ -243,6 +256,7 @@ if (panel !== null) {
     updateHint()
     syncEnablement()
     applyArenaShape()
+    applyPalette()
     seedInput.blur()
   })
   document.querySelector<HTMLButtonElement>('#opt-reseed')?.addEventListener('click', (e) => {

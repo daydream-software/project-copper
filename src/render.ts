@@ -9,7 +9,9 @@ import type { Asteroid, FieldMode, World } from './entities'
 
 interface Palette { bg: string, stroke: string, dim: string, charged: string }
 
-const PALETTES: Record<Config['palette'], Palette> = {
+// Exported so the DOM UI (panel, hint, page background) can theme itself to match the
+// canvas palette via CSS variables, not just the drawn world.
+export const PALETTES: Record<Config['palette'], Palette> = {
   copper: { bg: '#0a0a0a', stroke: '#d98a44', dim: '#b87333', charged: '#f6c98a' },
   mono: { bg: '#0a0a0a', stroke: '#d6d6d6', dim: '#8a8a8a', charged: '#ffffff' },
   neon: { bg: '#05060d', stroke: '#36e3ff', dim: '#2487a3', charged: '#b6f5ff' },

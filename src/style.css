@@ -1,7 +1,9 @@
-/* Copper-on-black, full-bleed. Everything else is drawn on the canvas in code. */
+/* Copper-on-black, full-bleed. Everything else is drawn on the canvas in code. The three
+   vars below are the copper defaults; main.ts overrides them from the active palette
+   (copper / mono / neon) so the whole UI themes with the canvas, not just the world. */
 :root {
-  --copper: #d98a44;
-  --copper-dim: #b87333;
+  --accent: #d98a44;
+  --dim: #b87333;
   --bg: #0a0a0a;
 }
 
@@ -15,7 +17,7 @@ html,
 body {
   height: 100%;
   background: var(--bg);
-  color: var(--copper-dim);
+  color: var(--dim);
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   overflow: hidden;
 }
@@ -41,7 +43,7 @@ main {
   display: block;
   max-width: 100%;
   max-height: 80vh;
-  border: 1px solid color-mix(in srgb, var(--copper-dim) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dim) 35%, transparent);
   border-radius: 4px;
   background: var(--bg);
 }
@@ -75,17 +77,36 @@ main {
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
   scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--dim) 55%, transparent) transparent; /* Firefox */
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   padding: 0.75rem 0.9rem;
   font-size: 0.8rem;
-  color: var(--copper);
+  color: var(--accent);
   background: color-mix(in srgb, var(--bg) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--copper-dim) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dim) 40%, transparent);
   border-radius: 6px;
   backdrop-filter: blur(2px);
   user-select: none;
+}
+
+/* WebKit/Blink scrollbar to match Firefox's scrollbar-color — a thin copper-tinted thumb. */
+#panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+#panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#panel::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--dim) 50%, transparent);
+  border-radius: 4px;
+}
+
+#panel::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--dim) 75%, transparent);
 }
 
 #panel h2 {
@@ -98,7 +119,7 @@ main {
 }
 
 #panel fieldset {
-  border: 1px solid color-mix(in srgb, var(--copper-dim) 25%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dim) 25%, transparent);
   border-radius: 4px;
   padding: 0.3rem 0.5rem 0.4rem;
   display: flex;
@@ -147,7 +168,7 @@ main {
   gap: 0.35rem;
   margin-left: 0.5rem;
   padding-left: 0.65rem;
-  border-left: 1px solid color-mix(in srgb, var(--copper-dim) 50%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--dim) 50%, transparent);
 }
 
 #panel .sub:has(input:disabled) {
@@ -160,7 +181,7 @@ main {
 }
 
 #panel input {
-  accent-color: var(--copper);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
@@ -170,9 +191,9 @@ main {
   padding: 0.25rem 0.4rem;
   font: inherit;
   font-size: 0.72rem;
-  color: var(--copper);
-  background: color-mix(in srgb, var(--copper) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--copper-dim) 40%, transparent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dim) 40%, transparent);
   border-radius: 3px;
   cursor: text;
 }
@@ -182,13 +203,13 @@ main {
   padding: 0.3rem 0.5rem;
   font: inherit;
   font-size: 0.78rem;
-  color: var(--copper);
+  color: var(--accent);
   background: transparent;
-  border: 1px solid color-mix(in srgb, var(--copper-dim) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dim) 45%, transparent);
   border-radius: 4px;
   cursor: pointer;
 }
 
 #panel button:hover {
-  background: color-mix(in srgb, var(--copper) 15%, transparent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
