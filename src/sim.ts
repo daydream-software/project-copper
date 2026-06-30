@@ -3,9 +3,9 @@
 // (rng.ts) for all randomness, so a run is reproducible and directly unit-testable.
 
 import { makeRng, random, range, type Rng } from './rng'
-import { bound, makeShape, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
+import { bound, deflect, makeShape, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
-import type { Asteroid, Bullet, FieldMode, Input, Ship, World } from './entities'
+import type { Asteroid, Bullet, FieldMode, Input, Pillar, Ship, World } from './entities'
 
 // --- Ship ---
 const TURN_RATE = 3.2 // rad/s
@@ -30,6 +30,11 @@ const ASTEROID_POINTS_MAX = 12
 const CHILD_SCALE = 0.58 // child radius = parent radius * this
 const SAFE_SPAWN_DIST = 140 // keep fresh asteroids off the ship
 const MOTE_MAX_SPEED = 720 // clamp so the field can't fling motes off to infinity (high enough for a charged fling)
+
+// --- Pillars (static obstacles; sandbox knob) ---
+const PILLAR_SHIP_CLEAR = 30 // extra gap so a pillar never spawns on the centred ship, px
+const PILLAR_GAP = 24 // desired gap between two pillars' surfaces, px (best-effort)
+const PILLAR_TRIES = 24 // placement attempts before accepting a tight spot
 
 // --- Polarity field (the core verb): pull motes in / push them away ---
 // Reach, strength, charge time and the full-charge fling speed are sandbox knobs (read
@@ -112,9 +117,32 @@ function spawnChild(rng: Rng, parent: Asteroid, childCharge: number): Asteroid {
   }
 }
 
-/** Build a fresh world: ship centred, a seeded asteroid field, no bullets. The field's
- * count / size / drift come from the sandbox config (defaulting to the shipped values),
- * so the same seed regenerates the same arena with whatever knobs are set. */
+// Place `count` static pillars in the inscribed disc (edges-agnostic, so it holds whether
+// the arena is the rectangle or the circle — a live toggle, not a generation knob). Each
+// sits at a seeded angle and an annulus radius clearing the centred ship and all four
+// walls; `margin` (max mote radius) stops a rim pillar pinning motes against the circle
+// wall. Inter-pillar spacing is best-effort, retried up to PILLAR_TRIES.
+function spawnPillars(rng: Rng, width: number, height: number, count: number, size: number, margin: number): Pillar[] {
+  const ringMin = SHIP_RADIUS + size + PILLAR_SHIP_CLEAR
+  const ringMax = Math.max(ringMin, Math.min(width, height) / 2 - size - margin)
+  const pillars: Pillar[] = []
+  for (let i = 0; i < count; i += 1) {
+    for (let t = 0; t < PILLAR_TRIES; t += 1) {
+      const a = random(rng) * Math.PI * 2
+      const rad = ringMin + random(rng) * (ringMax - ringMin)
+      const pos = { x: width / 2 + Math.cos(a) * rad, y: height / 2 + Math.sin(a) * rad }
+      const clear = pillars.every((p) => Math.hypot(p.pos.x - pos.x, p.pos.y - pos.y) > size + p.radius + PILLAR_GAP)
+      if (clear || t === PILLAR_TRIES - 1) { pillars.push({ pos, radius: size }); break }
+    }
+  }
+  return pillars
+}
+
+/** Build a fresh world: ship centred, a seeded asteroid field, no bullets, and (when the
+ * knob is set) static pillars. Count / size / drift and the pillar count / size come from
+ * config (defaulting to the shipped values), so the same seed regenerates the same arena
+ * with whatever knobs are set. Pillars draw from the rng *after* the asteroids and only
+ * when present, so an existing seed's field is unchanged with pillars off. */
 export function createWorld(seed: number, width: number, height: number, config: Config = DEFAULT_CONFIG): World {
   const rng = makeRng(seed)
   const ship: Ship = {
@@ -130,12 +158,21 @@ export function createWorld(seed: number, width: number, height: number, config:
   const asteroids = [...Array(config.moteCount).keys()].map(() =>
     spawnAsteroid(rng, width, height, config.moteSize, config.moteDrift, ship.pos),
   )
-  return { width, height, ship, bullets: [], asteroids, rngState: rng.s, t: 0 }
+  const pillars = config.pillarCount > 0 ? spawnPillars(rng, width, height, config.pillarCount, config.pillarSize, config.moteSize) : []
+  return { width, height, ship, bullets: [], asteroids, pillars, rngState: rng.s, t: 0 }
+}
+
+// Bounce a moving circle off every pillar in turn (pillars don't overlap, so folding the
+// deflections sequentially resolves cleanly).
+function bouncePillars(x: number, y: number, vx: number, vy: number, r: number, pillars: Pillar[]): { x: number, y: number, vx: number, vy: number } {
+  let s = { x, y, vx, vy }
+  for (const p of pillars) s = deflect(s.x, s.y, s.vx, s.vy, r, p.pos.x, p.pos.y, p.radius)
+  return s
 }
 
 // Turn, thrust, drag, clamp, then move (wrapping). Decrements the fire cooldown but
 // does not arm it — firing (which creates a bullet) is the caller's job.
-function stepShip(ship: Ship, input: Input, width: number, height: number, dt: number, config: Config): Ship {
+function stepShip(ship: Ship, input: Input, width: number, height: number, dt: number, config: Config, pillars: Pillar[]): Ship {
   const turn = (input.turnLeft ? -1 : 0) + (input.turnRight ? 1 : 0)
   const angle = ship.angle + turn * TURN_RATE * dt
   let vx = ship.vel.x
@@ -159,9 +196,10 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
   // The ship never dies at the edge (no game-over) — kill behaves like bounce for it.
   const shipMode = config.edges === 'kill' ? 'bounce' : config.edges
   const b = bound(ship.pos.x + vx * dt, ship.pos.y + vy * dt, vx, vy, SHIP_RADIUS, width, height, shipMode)
+  const p = bouncePillars(b.x, b.y, b.vx, b.vy, SHIP_RADIUS, pillars)
   return {
-    pos: { x: b.x, y: b.y },
-    vel: { x: b.vx, y: b.vy },
+    pos: { x: p.x, y: p.y },
+    vel: { x: p.vx, y: p.vy },
     angle,
     fireCooldown: Math.max(0, ship.fireCooldown - dt),
     thrusting: input.thrust,
@@ -229,7 +267,7 @@ function fieldForce(ship: Ship, a: Asteroid, dt: number, config: Config): { vx: 
 
 // Drift a mote: polarity field, then gravity well + friction (sandbox toggles), clamp,
 // move + spin (wrapping or bouncing). The field touching it (re)charges it.
-function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number, config: Config): Asteroid | null {
+function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number, config: Config, pillars: Pillar[]): Asteroid | null {
   const f = fieldForce(ship, a, dt, config)
   let { vx, vy } = f
   if (config.well) {
@@ -257,10 +295,11 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
   }
   const b = bound(a.pos.x + vx * dt, a.pos.y + vy * dt, vx, vy, a.radius, width, height, config.edges)
   if (b.dead) return null // killed at the edge (kill mode)
+  const p = bouncePillars(b.x, b.y, b.vx, b.vy, a.radius, pillars)
   return {
     ...a,
-    vel: { x: b.vx, y: b.vy },
-    pos: { x: b.x, y: b.y },
+    vel: { x: p.vx, y: p.vy },
+    pos: { x: p.x, y: p.y },
     angle: a.angle + a.spin * dt,
     charge: f.touched ? chargeTimeFor(a.radius) : Math.max(0, a.charge - dt),
   }
@@ -497,7 +536,7 @@ function reactMotes(rng: Rng, motes: Asteroid[], bullets: Bullet[], config: Conf
  * unaffected. */
 export function step(world: World, input: Input, dt: number, config: Config = DEFAULT_CONFIG): World {
   const rng = makeRng(world.rngState)
-  const ship = stepShip(world.ship, input, world.width, world.height, dt, config)
+  const ship = stepShip(world.ship, input, world.width, world.height, dt, config, world.pillars)
 
   // Advance bullets, then fire (arming the cooldown) if the gun is enabled and triggered.
   const flying = advanceBullets(world.bullets, world.width, world.height, dt, config.edges)
@@ -508,7 +547,7 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
   // A gather pulse yanks motes inward first, then the continuous field + drift + wrap,
   // then the post-movement passes (repel / bounce / split / bullet hits / conduction).
   const kicked = input.pulse ? world.asteroids.map((a) => pulseKick(a, ship.pos)) : world.asteroids
-  const moved = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, config)).filter((a): a is Asteroid => a !== null)
+  const moved = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, config, world.pillars)).filter((a): a is Asteroid => a !== null)
   const reacted = reactMotes(rng, moved, bullets, config, dt)
 
   // Keep the field populated to the configured count (no game-over yet: it's a sandbox).
@@ -523,6 +562,7 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
     ship: armed,
     bullets: reacted.bullets,
     asteroids: [...reacted.asteroids, ...refill],
+    pillars: world.pillars, // static: carried through unchanged
     rngState: rng.s,
     t: world.t + dt,
   }

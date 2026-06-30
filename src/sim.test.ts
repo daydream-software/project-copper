@@ -35,6 +35,7 @@ function makeWorld(over: Partial<World> = {}): World {
     ship: { pos: { x: 400, y: 300 }, vel: { x: 0, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off', charge: 0, pulseT: 99 },
     bullets: [],
     asteroids: [],
+    pillars: [],
     rngState: 12345,
     t: 0,
     ...over,
@@ -365,6 +366,39 @@ describe('field knobs', () => {
       press({ attract: true, repel: true }), DT, cfg({ vortexSwirl: swirl }),
     )
     expect(Math.abs(wound(900).asteroids[0].vel.y)).toBeGreaterThan(Math.abs(wound(300).asteroids[0].vel.y))
+  })
+})
+
+describe('pillars', () => {
+  it('createWorld spawns config.pillarCount pillars at config.pillarSize (none by default)', () => {
+    expect(createWorld(7, 720, 720).pillars).toHaveLength(0) // off by default
+    const w = createWorld(7, 720, 720, cfg({ pillarCount: 4, pillarSize: 36 }))
+    expect(w.pillars).toHaveLength(4)
+    expect(w.pillars.every((p) => p.radius === 36)).toBe(true)
+  })
+
+  it('places every pillar clear of the centred ship and inside the arena', () => {
+    const w = createWorld(7, 720, 720, cfg({ pillarCount: 6, pillarSize: 40 }))
+    for (const p of w.pillars) {
+      const d = Math.hypot(p.pos.x - 360, p.pos.y - 360) // centre of a 720² arena
+      expect(d).toBeGreaterThanOrEqual(p.radius + 16) // clears the ship (SHIP_RADIUS) at the centre
+      expect(d + p.radius).toBeLessThanOrEqual(360) // fully inside the inscribed circle
+    }
+  })
+
+  it('a mote moving into a pillar bounces off it', () => {
+    const pillar = { pos: { x: 400, y: 300 }, radius: 40 }
+    const m = { pos: { x: 450, y: 300 }, vel: { x: -100, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 0 }
+    const w = step(makeWorld({ asteroids: [m], pillars: [pillar] }), NONE, DT)
+    expect(w.asteroids[0].vel.x).toBeGreaterThan(0) // inward velocity reflected outward
+    expect(Math.hypot(w.asteroids[0].pos.x - 400, w.asteroids[0].pos.y - 300)).toBeGreaterThanOrEqual(70) // pushed to the surface (40 + 30)
+  })
+
+  it('the ship bounces off a pillar', () => {
+    const pillar = { pos: { x: 400, y: 300 }, radius: 40 }
+    const ship = { pos: { x: 450, y: 300 }, vel: { x: -120, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' as const, charge: 0, pulseT: 99 }
+    const w = step(makeWorld({ ship, pillars: [pillar] }), NONE, DT)
+    expect(w.ship.vel.x).toBeGreaterThan(0) // reflected away from the pillar
   })
 })
 

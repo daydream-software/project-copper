@@ -55,6 +55,13 @@ export interface Asteroid {
   polarity?: number
 }
 
+/** A static obstacle: a solid disc that motes and the ship bounce off. Placed once in
+ * createWorld (seeded), never moves — so it carries no velocity. */
+export interface Pillar {
+  pos: Vec2
+  radius: number
+}
+
 /** The per-step intent collected from the keyboard. */
 export interface Input {
   thrust: boolean
@@ -76,6 +83,8 @@ export interface World {
   ship: Ship
   bullets: Bullet[]
   asteroids: Asteroid[]
+  /** Static obstacles (a sandbox knob; empty when pillarCount is 0). */
+  pillars: Pillar[]
   /** Serialisable PRNG cursor (see rng.ts) — makes the field reproducible. */
   rngState: number
   /** Elapsed sim time, seconds. */

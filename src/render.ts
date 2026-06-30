@@ -47,6 +47,7 @@ export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config
   if (config.trails === 'full') drawGhosts(ctx, ghosts)
   else if (config.trails === 'dust') drawGrains(ctx, grains)
 
+  drawPillars(ctx, world)
   drawField(ctx, world, config)
   drawAsteroids(ctx, world)
   drawBullets(ctx, world)
@@ -92,6 +93,26 @@ function drawGhosts(ctx: CanvasRenderingContext2D, ghosts: Ghost[]): void {
     ctx.restore()
   }
   ctx.globalAlpha = 1
+}
+
+// Static pillars: solid discs the motes and ship bounce off. A faint filled core with a
+// stroked rim and a concentric inner ring reads as a hard obstacle (not another mote).
+function drawPillars(ctx: CanvasRenderingContext2D, world: World): void {
+  for (const p of world.pillars) {
+    ctx.fillStyle = active.dim
+    ctx.globalAlpha = 0.18
+    ctx.beginPath()
+    ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = active.dim
+    ctx.lineWidth = 2
+    ctx.stroke() // outer rim (same path)
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.arc(p.pos.x, p.pos.y, p.radius * 0.55, 0, Math.PI * 2)
+    ctx.stroke() // inner ring for depth
+  }
 }
 
 // A gather pulse: a ring that collapses inward from PULSE_RANGE and fades — a sharp tug.

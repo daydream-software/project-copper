@@ -45,6 +45,10 @@ export interface Config {
   moteSize: number
   /** Max drift speed of a freshly-spawned mote, px/s. */
   moteDrift: number
+  /** How many static pillar obstacles to place (0 = none). */
+  pillarCount: number
+  /** Radius of each pillar, px. */
+  pillarSize: number
   /** Motes are pulled toward the arena centre (a gravity well). */
   well: boolean
   /** Motes lose speed over time (drag). */
@@ -84,6 +88,8 @@ export const DEFAULT_CONFIG: Config = {
   moteCount: 6,
   moteSize: 48,
   moteDrift: 60,
+  pillarCount: 0,
+  pillarSize: 40,
   well: false,
   friction: false,
   moteCollision: false,

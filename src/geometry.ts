@@ -50,6 +50,30 @@ export function bound(x: number, y: number, vx: number, vy: number, r: number, w
   return { x: ex.p, y: ey.p, vx: ex.v, vy: ey.v, dead: ex.dead || ey.dead }
 }
 
+/**
+ * Bounce a moving circle (radius `r` at `x,y` with velocity `vx,vy`) off a SOLID disc
+ * obstacle (centre `cx,cy`, radius `obstacleR`) — the inverse of the `circle` arena,
+ * which contains. If they overlap, push the circle out to the contact surface and
+ * reflect only the inward normal component (so a circle already moving away keeps its
+ * speed — no energy is added). A perfect bounce, like the rectangle/circle edges.
+ */
+export function deflect(x: number, y: number, vx: number, vy: number, r: number, cx: number, cy: number, obstacleR: number): { x: number, y: number, vx: number, vy: number } {
+  const minD = obstacleR + r
+  const dx = x - cx
+  const dy = y - cy
+  const d = Math.hypot(dx, dy)
+  if (d >= minD || d <= 0) return { x, y, vx, vy } // clear (or dead-centre: leave it for next frame)
+  const nx = dx / d
+  const ny = dy / d
+  const vn = vx * nx + vy * ny // <0 when moving toward the obstacle
+  return {
+    x: cx + nx * minD, // pushed out to the surface
+    y: cy + ny * minD,
+    vx: vn < 0 ? vx - 2 * vn * nx : vx, // reflect only the inward component
+    vy: vn < 0 ? vy - 2 * vn * ny : vy,
+  }
+}
+
 /** Do two circles overlap? (squared-distance test, no sqrt.) */
 export function overlap(a: Vec2, ar: number, b: Vec2, br: number): boolean {
   const dx = a.x - b.x

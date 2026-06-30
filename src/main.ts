@@ -62,6 +62,8 @@ function readPanel(): Config {
     moteCount: num('#opt-moteCount', 6),
     moteSize: num('#opt-moteSize', 48),
     moteDrift: num('#opt-moteDrift', 60),
+    pillarCount: num('#opt-pillarCount', 0),
+    pillarSize: num('#opt-pillarSize', 40),
     well: checked('#opt-well'),
     friction: checked('#opt-friction'),
     moteCollision: checked('#opt-moteCollision'),
@@ -88,6 +90,7 @@ let world: World = createWorld(currentSeed, canvas.width, canvas.height, config)
 // (the toggles, by contrast, just take effect on the next step). Detect that here.
 function genChanged(a: Config, b: Config): boolean {
   return a.moteCount !== b.moteCount || a.moteSize !== b.moteSize || a.moteDrift !== b.moteDrift
+    || a.pillarCount !== b.pillarCount || a.pillarSize !== b.pillarSize
 }
 
 // Piercing / chain reaction only matter when charged motes split, so disable them
