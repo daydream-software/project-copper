@@ -7,6 +7,7 @@ import { DEFAULT_CONFIG, type Config } from './config'
 import { draw } from './render'
 import { createInput } from './input'
 import { createLoop } from './loop'
+import { resumeAudio, setMusic, setSfx, sfxPulse, sfxShatter } from './audio'
 import type { World } from './entities'
 
 function readSeed(): number {
@@ -56,6 +57,20 @@ function syncEnablement(): void {
   }
 }
 
+// Read the music/SFX controls (separate from the sim Config — audio is output only).
+function applyAudio(): void {
+  const m = document.querySelector<HTMLInputElement>('input[name="music"]:checked')?.value
+  setMusic(m === 'between' || m === 'autorun' ? m : 'off')
+  setSfx(checked('#opt-sfx'))
+}
+
+// Browsers block audio until a user gesture — resume on the first one.
+const onFirstGesture = (): void => {
+  resumeAudio()
+}
+window.addEventListener('pointerdown', onFirstGesture, { once: true })
+window.addEventListener('keydown', onFirstGesture, { once: true })
+
 // Keep the on-screen hint in sync with the active config.
 function updateHint(): void {
   const parts = ['↑ thrust', '← → turn', config.gather === 'attract' ? 'hold space = attract' : 'tap space = gather pulse']
@@ -67,6 +82,7 @@ function updateHint(): void {
 }
 updateHint()
 syncEnablement()
+applyAudio()
 
 const panel = document.querySelector<HTMLElement>('#panel')
 if (panel !== null) {
@@ -74,6 +90,7 @@ if (panel !== null) {
     config = readPanel()
     updateHint()
     syncEnablement()
+    applyAudio()
     // Blur the control so the next space/shift goes to the game, not the checkbox.
     if (e.target instanceof HTMLElement) e.target.blur()
   })
@@ -82,6 +99,10 @@ if (panel !== null) {
     if (e.target instanceof HTMLElement) e.target.blur()
   })
 }
+
+// SFX are driven by observable changes in the world (the sim itself stays silent).
+let prevPulseT = world.ship.pulseT
+let prevCount = world.asteroids.length
 
 const loop = createLoop(
   (dt) => {
@@ -92,6 +113,10 @@ const loop = createLoop(
   },
   () => {
     draw(ctx, world)
+    if (world.ship.pulseT < 0.05 && prevPulseT > 0.1) sfxPulse() // a gather pulse just fired
+    if (world.asteroids.length > prevCount) sfxShatter() // motes split (heuristic: count grew)
+    prevPulseT = world.ship.pulseT
+    prevCount = world.asteroids.length
   },
 )
 loop.start()

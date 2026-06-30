@@ -22,8 +22,9 @@ though, is ours — **polarity**, not guns.
 ## Pillars
 
 1. **Purely geometric.** Every visible thing is a stroked vector path drawn in code —
-   ship, motes, field rings, tethers. **No image, audio or font assets** to make,
-   manage, or break. (Audio may arrive much later as its own slice; not a pillar.)
+   ship, motes, field rings, tethers — **no image or font assets**. Sound is the one
+   exception: two looping music tracks (`src/audio/`, from the workspace `suno-songs/`)
+   plus a few **synthesized** WebAudio SFX (no sound files) — all behind a panel toggle.
 2. **Simple to grasp, simple to grow.** The verb is "bend the field." New mechanics
    stack onto a clean core; nothing in the foundation needs to be undone to add them.
 3. **Pure, deterministic, seedable.** The whole simulation is `step(world, input,
@@ -73,4 +74,4 @@ The growth path leans into the Nova-Drift-flavoured depth, asset-free:
   behaviours.
 - **Make it a game** — ship × mote collision, lives, score, runs (roguelite shape).
 - **Juice & variety** — line-debris, mote types, hazards, waves, palette themes.
-- **Audio** — much later, via the workspace `suno-songs/` folder.
+- **Audio (done)** — two looping tracks (Between Runs / Autorun) + synth SFX, panel toggle.

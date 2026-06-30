@@ -3,7 +3,8 @@
 A tiny **polarity sandbox**: you're a charged point drifting through a wrapping field
 of motes. You don't shoot — you **gather** them (a pulse), **scatter** them (repel),
 or hold both to spin them into a **vortex**. Everything is **stroked vector geometry
-drawn in code**: no images, no audio, no fonts. It starts as a sandbox toy and grows
+drawn in code** (no images, no fonts; two looping music tracks + synth SFX behind a
+toggle). It starts as a sandbox toy and grows
 toward a Nova-Drift-flavoured, asset-free build-craft depth.
 
 > Pillars: **purely geometric** (no assets) · **simple to grasp, simple to grow** ·

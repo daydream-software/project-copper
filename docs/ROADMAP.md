@@ -60,7 +60,13 @@ unit test.
 7. **Make it a game (optional).** Ship × mote collision, lives, score, runs.
 8. **Juice & variety.** Line-debris, mote types, hazards, waves, palette themes; maybe
    revive the dormant **shot** as a second verb (Nova Drift keeps both).
-9. **Audio (much later).** Via the workspace `suno-songs/` folder.
+### Slice A — audio (done)
+
+Two looping music tracks (`src/audio/between-runs.ogg`, `autorun.mp3` — from
+`suno-songs/`) and synthesized WebAudio SFX (`src/audio.ts` — pulse + shatter, no sound
+files), behind a **Music** radio (Off / Between Runs / Autorun) and an **SFX** toggle in
+the panel. `main.ts` resumes audio on the first gesture and drives SFX from observed
+world changes (pulse via `pulseT`, shatter heuristically via mote-count growth).
 
 ## Method
 
