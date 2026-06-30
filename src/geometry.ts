@@ -102,6 +102,17 @@ export function overlap(a: Vec2, ar: number, b: Vec2, br: number): boolean {
   return dx * dx + dy * dy < r * r
 }
 
+/**
+ * Shortest signed delta from `from` to `to` on an axis of length `size` — the
+ * minimum-image convention of a wrapped (toroidal) arena, so two bodies near opposite
+ * edges read as neighbours across the seam, not a whole arena apart. Plain difference when
+ * not wrapping. Valid while interaction ranges stay under size/2 (true for every range here).
+ */
+export function axisDelta(from: number, to: number, size: number, wrap: boolean): number {
+  const d = to - from
+  return wrap ? d - size * Math.round(d / size) : d
+}
+
 /** The oriented-outline subset of a mote that shape-aware contact needs. */
 export interface Outline { pos: Vec2, radius: number, angle: number, shape: Vec2[] }
 
@@ -132,9 +143,9 @@ export function outlineRadius(shape: Vec2[], radius: number, angle: number, ux: 
  * the sum of each outline's reach toward the other — so a hit follows the drawn polygon,
  * not its (larger) bounding circle. Coincident centres count as in contact.
  */
-export function outlinesTouch(a: Outline, b: Outline): boolean {
-  const dx = b.pos.x - a.pos.x
-  const dy = b.pos.y - a.pos.y
+export function outlinesTouch(a: Outline, b: Outline, width: number, height: number, wrap: boolean): boolean {
+  const dx = axisDelta(a.pos.x, b.pos.x, width, wrap)
+  const dy = axisDelta(a.pos.y, b.pos.y, height, wrap)
   const d = Math.hypot(dx, dy)
   if (d <= 0) return true
   const ra = outlineRadius(a.shape, a.radius, a.angle, dx / d, dy / d)

@@ -3,7 +3,7 @@
 // (rng.ts) for all randomness, so a run is reproducible and directly unit-testable.
 
 import { makeRng, random, range, type Rng } from './rng'
-import { bound, makeShape, outlineRadius, outlinesTouch, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
+import { axisDelta, bound, makeShape, outlineRadius, outlinesTouch, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import { bouncePillars, spawnPillars } from './pillars'
 import type { Asteroid, Bullet, FieldMode, Input, Pillar, Ship, World } from './entities'
@@ -274,15 +274,15 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
 
 // Charged motes repel each other (sandbox toggle): each is nudged away from every other
 // charged mote within range — applied to velocity (takes effect next step).
-function applyChargedRepel(motes: Asteroid[], dt: number): Asteroid[] {
+function applyChargedRepel(motes: Asteroid[], dt: number, width: number, height: number, wrap: boolean): Asteroid[] {
   return motes.map((m, i) => {
     if (m.charge <= 0) return m
     let vx = m.vel.x
     let vy = m.vel.y
     for (const [j, o] of motes.entries()) {
       if (i === j || o.charge <= 0) continue
-      const dx = m.pos.x - o.pos.x
-      const dy = m.pos.y - o.pos.y
+      const dx = axisDelta(o.pos.x, m.pos.x, width, wrap)
+      const dy = axisDelta(o.pos.y, m.pos.y, height, wrap)
       const d2 = dx * dx + dy * dy
       if (d2 <= 0 || d2 >= CHARGED_REPEL_RANGE * CHARGED_REPEL_RANGE) continue
       const d = Math.sqrt(d2)
@@ -296,7 +296,7 @@ function applyChargedRepel(motes: Asteroid[], dt: number): Asteroid[] {
 
 // Bipolar (sandbox toggle): charged motes interact by their intrinsic polarity — like
 // poles repel, opposite poles attract — within BIPOLAR_RANGE.
-function applyBipolar(motes: Asteroid[], dt: number): Asteroid[] {
+function applyBipolar(motes: Asteroid[], dt: number, width: number, height: number, wrap: boolean): Asteroid[] {
   return motes.map((m, i) => {
     if (m.charge <= 0) return m
     const pm = m.polarity ?? 1
@@ -304,8 +304,8 @@ function applyBipolar(motes: Asteroid[], dt: number): Asteroid[] {
     let vy = m.vel.y
     for (const [j, o] of motes.entries()) {
       if (i === j || o.charge <= 0) continue
-      const dx = m.pos.x - o.pos.x
-      const dy = m.pos.y - o.pos.y
+      const dx = axisDelta(o.pos.x, m.pos.x, width, wrap)
+      const dy = axisDelta(o.pos.y, m.pos.y, height, wrap)
       const d2 = dx * dx + dy * dy
       if (d2 <= 0 || d2 >= BIPOLAR_RANGE * BIPOLAR_RANGE) continue
       const d = Math.sqrt(d2)
@@ -322,15 +322,15 @@ function applyBipolar(motes: Asteroid[], dt: number): Asteroid[] {
 // instead of passing through. Each overlapping pair is separated and exchanges momentum
 // along the contact normal (mass ∝ radius²). O(n²) over the small field; works on local
 // position/velocity arrays so it never mutates the input motes.
-function resolveMoteBounce(motes: Asteroid[]): Asteroid[] {
+function resolveMoteBounce(motes: Asteroid[], width: number, height: number, wrap: boolean): Asteroid[] {
   const px = motes.map((m) => m.pos.x)
   const py = motes.map((m) => m.pos.y)
   const vx = motes.map((m) => m.vel.x)
   const vy = motes.map((m) => m.vel.y)
   for (let i = 0; i < motes.length; i += 1) {
     for (let j = i + 1; j < motes.length; j += 1) {
-      const dx = px[j] - px[i]
-      const dy = py[j] - py[i]
+      const dx = axisDelta(px[i], px[j], width, wrap)
+      const dy = axisDelta(py[i], py[j], height, wrap)
       const d2 = dx * dx + dy * dy
       if (d2 <= 0) continue // coincident — no contact normal; leave to next frame
       const d = Math.sqrt(d2)
@@ -364,13 +364,13 @@ function resolveMoteBounce(motes: Asteroid[]): Asteroid[] {
 // mote becomes charged — current spreading through nearby conductors. Runs as its own
 // pass, so it works alongside split (split shatters on contact; conduction lights up the
 // surroundings). Charge still decays, so the glow follows wherever motes cluster.
-function applyConduction(motes: Asteroid[]): Asteroid[] {
+function applyConduction(motes: Asteroid[], width: number, height: number, wrap: boolean): Asteroid[] {
   return motes.map((m) => {
     if (m.charge > 0) return m
     for (const o of motes) {
       if (o.charge <= 0) continue
-      const dx = m.pos.x - o.pos.x
-      const dy = m.pos.y - o.pos.y
+      const dx = axisDelta(o.pos.x, m.pos.x, width, wrap)
+      const dy = axisDelta(o.pos.y, m.pos.y, height, wrap)
       if (dx * dx + dy * dy < CONDUCTION_RANGE * CONDUCTION_RANGE) return { ...m, charge: chargeTimeFor(m.radius) }
     }
     return m
@@ -380,7 +380,7 @@ function applyConduction(motes: Asteroid[]): Asteroid[] {
 // A charged mote that overlaps an uncharged one triggers the bullet-style split.
 // Charged↔charged and uncharged↔uncharged do nothing. Returns the uncharged motes hit
 // (`targets`) and the charged motes that hit something (`chargers`).
-function findMoteSplits(motes: Asteroid[]): { targets: Set<number>, chargers: Set<number> } {
+function findMoteSplits(motes: Asteroid[], width: number, height: number, wrap: boolean): { targets: Set<number>, chargers: Set<number> } {
   const targets = new Set<number>()
   const chargers = new Set<number>()
   for (const [i, mi] of motes.entries()) {
@@ -388,7 +388,7 @@ function findMoteSplits(motes: Asteroid[]): { targets: Set<number>, chargers: Se
     for (const [j, mj] of motes.entries()) {
       if (i === j) continue
       if (mj.charge > 0) continue
-      if (!outlinesTouch(mi, mj)) continue // contact follows the drawn outline, not the bounding circle
+      if (!outlinesTouch(mi, mj, width, height, wrap)) continue // outline contact, wrap-aware across the seam
       targets.add(j)
       chargers.add(i)
     }
@@ -397,12 +397,12 @@ function findMoteSplits(motes: Asteroid[]): { targets: Set<number>, chargers: Se
 }
 
 // Burst: shove a mote outward from each shatter centre within BURST_RADIUS.
-function burstPush(m: Asteroid, centers: Vec2[]): Asteroid {
+function burstPush(m: Asteroid, centers: Vec2[], width: number, height: number, wrap: boolean): Asteroid {
   let vx = m.vel.x
   let vy = m.vel.y
   for (const c of centers) {
-    const dx = m.pos.x - c.x
-    const dy = m.pos.y - c.y
+    const dx = axisDelta(c.x, m.pos.x, width, wrap)
+    const dy = axisDelta(c.y, m.pos.y, height, wrap)
     const d2 = dx * dx + dy * dy
     if (d2 <= 0 || d2 >= BURST_RADIUS * BURST_RADIUS) continue
     const d = Math.sqrt(d2)
@@ -415,9 +415,10 @@ function burstPush(m: Asteroid, centers: Vec2[]): Asteroid {
 
 // Shatter centres are collected for every charged hit (the `shatters` output, which the
 // view turns into debris); burst reuses the same centres as shockwave origins.
-function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): { asteroids: Asteroid[], shatters: Vec2[] } {
+function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config, width: number, height: number): { asteroids: Asteroid[], shatters: Vec2[] } {
   if (motes.length >= MAX_MOTES) return { asteroids: motes, shatters: [] } // safety valve: stop splitting
-  const { targets, chargers } = findMoteSplits(motes)
+  const wrap = config.edges === 'wrap'
+  const { targets, chargers } = findMoteSplits(motes, width, height, wrap)
   const out: Asteroid[] = []
   const shatters: Vec2[] = []
   for (const [idx, m] of motes.entries()) {
@@ -436,7 +437,7 @@ function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): { a
       out.push(m)
     }
   }
-  return { asteroids: config.burst && shatters.length > 0 ? out.map((m) => burstPush(m, shatters)) : out, shatters }
+  return { asteroids: config.burst && shatters.length > 0 ? out.map((m) => burstPush(m, shatters, width, height, wrap)) : out, shatters }
 }
 
 // Advance existing bullets, age them, cull the expired.
@@ -493,13 +494,16 @@ function resolveCollisions(rng: Rng, bullets: Bullet[], asteroids: Asteroid[]): 
 
 // The post-movement mote passes, gated by config: charged repel, mote↔mote bounce,
 // charged-split, (dormant) bullet hits, then conduction.
-function reactMotes(rng: Rng, motes: Asteroid[], bullets: Bullet[], config: Config, dt: number): { asteroids: Asteroid[], bullets: Bullet[], shatters: Vec2[] } {
-  const repelled = config.chargedRepel ? applyChargedRepel(motes, dt) : motes
-  const bip = config.bipolar ? applyBipolar(repelled, dt) : repelled
-  const bounced = config.moteCollision ? resolveMoteBounce(bip) : bip
-  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, bounced, config) : { asteroids: bounced, shatters: [] }
+function reactMotes(rng: Rng, motes: Asteroid[], bullets: Bullet[], config: Config, dt: number, width: number, height: number): { asteroids: Asteroid[], bullets: Bullet[], shatters: Vec2[] } {
+  // Mote↔mote passes measure distance the toroidal way in wrap mode, so a pair straddling
+  // an edge interacts across the seam instead of reading as a whole arena apart.
+  const wrap = config.edges === 'wrap'
+  const repelled = config.chargedRepel ? applyChargedRepel(motes, dt, width, height, wrap) : motes
+  const bip = config.bipolar ? applyBipolar(repelled, dt, width, height, wrap) : repelled
+  const bounced = config.moteCollision ? resolveMoteBounce(bip, width, height, wrap) : bip
+  const reacted = config.chargedSplit ? resolveMoteCollisions(rng, bounced, config, width, height) : { asteroids: bounced, shatters: [] }
   const hit = resolveCollisions(rng, bullets, reacted.asteroids)
-  const conducted = config.conduction ? applyConduction(hit.asteroids) : hit.asteroids
+  const conducted = config.conduction ? applyConduction(hit.asteroids, width, height, wrap) : hit.asteroids
   return { asteroids: conducted, bullets: hit.bullets, shatters: reacted.shatters }
 }
 
@@ -520,7 +524,7 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
   // then the post-movement passes (repel / bounce / split / bullet hits / conduction).
   const kicked = input.pulse ? world.asteroids.map((a) => pulseKick(a, ship.pos)) : world.asteroids
   const moved = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, config, world.pillars)).filter((a): a is Asteroid => a !== null)
-  const reacted = reactMotes(rng, moved, bullets, config, dt)
+  const reacted = reactMotes(rng, moved, bullets, config, dt, world.width, world.height)
 
   // Keep the field populated to the configured count (no game-over yet: it's a sandbox).
   const deficit = Math.max(0, config.moteCount - reacted.asteroids.length)

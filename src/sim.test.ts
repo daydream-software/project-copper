@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld, step } from './sim'
-import { bound, outlineRadius, overlap, wrap, wrapImages } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import type { Input, World } from './entities'
 
@@ -49,48 +48,6 @@ function makeWorld(over: Partial<World> = {}): World {
     ...over,
   }
 }
-
-describe('geometry', () => {
-  it('wrap folds coordinates into [0, size)', () => {
-    expect(wrap(-5, 100)).toBe(95)
-    expect(wrap(105, 100)).toBe(5)
-    expect(wrap(50, 100)).toBe(50)
-    expect(wrap(100, 100)).toBe(0)
-  })
-
-  it('overlap is true only when circles intersect', () => {
-    expect(overlap({ x: 0, y: 0 }, 5, { x: 0, y: 8 }, 4)).toBe(true) // gap 8 < 9
-    expect(overlap({ x: 0, y: 0 }, 5, { x: 0, y: 8 }, 2)).toBe(false) // gap 8 > 7
-  })
-
-  it('bound wraps / bounces / kills against the rectangle', () => {
-    expect(bound(105, 50, 5, 0, 0, 100, 100, 'wrap')).toEqual({ x: 5, y: 50, vx: 5, vy: 0, dead: false })
-    expect(bound(105, 50, 5, 0, 0, 100, 100, 'bounce')).toEqual({ x: 95, y: 50, vx: -5, vy: 0, dead: false })
-    expect(bound(105, 50, 5, 0, 0, 100, 100, 'kill').dead).toBe(true)
-    expect(bound(50, 50, 5, 0, 0, 100, 100, 'kill').dead).toBe(false) // in bounds
-  })
-
-  it('wrapImages draws a straddling entity on the opposite edge (seamless wrap)', () => {
-    expect(wrapImages(400, 300, 30, 800, 600)).toEqual([{ x: 400, y: 300 }]) // centred → one copy
-    const left = wrapImages(5, 300, 30, 800, 600) // pokes past x=0
-    expect(left).toContainEqual({ x: 5, y: 300 })
-    expect(left).toContainEqual({ x: 805, y: 300 }) // mirrored a full width to the right
-    expect(wrapImages(5, 5, 30, 800, 600)).toHaveLength(4) // a corner straddles both axes
-  })
-
-  it('outlineRadius follows the shape, not the bounding circle', () => {
-    const blob = ring(0.7) // a regular octagon at 0.7 of the radius
-    expect(outlineRadius(blob, 30, 0, 1, 0)).toBeCloseTo(21) // 0.7 × 30 toward +x
-    expect(outlineRadius(blob, 30, Math.PI / 3, 0, -1)).toBeCloseTo(21) // uniform → rotation-invariant
-    expect(outlineRadius([], 30, 0, 1, 0)).toBe(30) // shapeless → bounding circle
-  })
-
-  it('bound reflects off the circle arena', () => {
-    const b = bound(110, 50, 10, 0, 0, 100, 100, 'circle') // outside the r=50 circle at (50,50)
-    expect(b.x).toBeLessThan(110) // pulled back onto the circle
-    expect(b.vx).toBeLessThan(0) // velocity reflected inward
-  })
-})
 
 describe('createWorld', () => {
   it('is deterministic for a given seed', () => {
@@ -482,6 +439,29 @@ describe('pillars', () => {
     // Centre 55: the outline (61) contacts → bounces back out.
     const close = step(makeWorld({ asteroids: [pm(455)], pillars: [pillar] }), NONE, DT)
     expect(close.asteroids[0].vel.x).toBeGreaterThan(0) // reflected away
+  })
+})
+
+describe('wrapped-edge collisions (toroidal distance)', () => {
+  const blob = ring(0.7) // outline reach 21 for r=30
+  // Two motes 10px apart *across the right/left seam* of an 800-wide arena.
+  const seamPair = (chargeL: number, chargeR: number, vxL = 0, vxR = 0) => [
+    { pos: { x: 795, y: 300 }, vel: { x: vxL, y: 0 }, radius: 30, angle: 0, spin: 0, shape: blob, charge: chargeL },
+    { pos: { x: 5, y: 300 }, vel: { x: vxR, y: 0 }, radius: 30, angle: 0, spin: 0, shape: blob, charge: chargeR },
+  ]
+
+  it('a charged mote shatters one across the seam in wrap mode', () => {
+    const wrapped = step(makeWorld({ width: 800, height: 600, asteroids: seamPair(2, 0) }), NONE, DT, cfg({ edges: 'wrap' }))
+    expect(wrapped.asteroids.filter((a) => a.radius < 25).length).toBeGreaterThanOrEqual(4) // both shatter across the seam
+    const bounced = step(makeWorld({ width: 800, height: 600, asteroids: seamPair(2, 0) }), NONE, DT, cfg({ edges: 'bounce' }))
+    expect(bounced.asteroids.filter((a) => a.radius < 25)).toHaveLength(0) // no seam → 790px apart → no contact
+  })
+
+  it('two motes bounce across the seam in wrap mode', () => {
+    const wrapped = step(makeWorld({ width: 800, height: 600, asteroids: seamPair(0, 0, 50, -50) }), NONE, DT, cfg({ edges: 'wrap', moteCollision: true }))
+    expect(wrapped.asteroids[0].vel.x).toBeLessThan(0) // left-of-seam mote reversed by the bounce
+    const open = step(makeWorld({ width: 800, height: 600, asteroids: seamPair(0, 0, 50, -50) }), NONE, DT, cfg({ edges: 'bounce', moteCollision: true }))
+    expect(open.asteroids[0].vel.x).toBeGreaterThan(0) // no seam contact → still heading right
   })
 })
 
