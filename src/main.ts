@@ -4,7 +4,7 @@
 import './style.css'
 import { createWorld, step } from './sim'
 import type { Config } from './config'
-import { draw } from './render'
+import { draw, type TrailDot } from './render'
 import { createInput } from './input'
 import { createLoop } from './loop'
 import { resumeAudio, setMusic, setSfx, sfxPulse, sfxShatter } from './audio'
@@ -116,10 +116,40 @@ if (panel !== null) {
   })
 }
 
-// SFX and screen-shake are driven by observable changes in the world (sim stays silent).
+// SFX, screen-shake and trail particles are driven by the world each frame (the sim
+// itself stays silent and trail-free — these are view concerns).
 let prevPulseT = world.ship.pulseT
 let prevCount = world.asteroids.length
 let shake = 0 // current screen-shake magnitude, px
+let trail: TrailDot[] = []
+const TRAIL_MAX = 3500 // particle cap
+
+// Drop a trail particle at a point. dust = sparse, small, faint, short-lived grains;
+// full = a dense longer-lived streak.
+function dropTrail(x: number, y: number, dust: boolean): void {
+  if (dust && Math.random() > 0.55) return
+  const jitter = dust ? 4 : 0
+  const life = dust ? 14 : 42
+  trail.push({
+    x: x + (Math.random() * 2 - 1) * jitter,
+    y: y + (Math.random() * 2 - 1) * jitter,
+    life,
+    max: life,
+    r: dust ? 1 : 1.6,
+    a: dust ? 0.45 : 0.8,
+  })
+}
+
+function stepTrail(): void {
+  if (config.trails !== 'off') {
+    const dust = config.trails === 'dust'
+    dropTrail(world.ship.pos.x, world.ship.pos.y, dust)
+    for (const m of world.asteroids) dropTrail(m.pos.x, m.pos.y, dust)
+  }
+  for (const p of trail) p.life -= 1
+  trail = trail.filter((p) => p.life > 0)
+  if (trail.length > TRAIL_MAX) trail = trail.slice(-TRAIL_MAX)
+}
 
 const loop = createLoop(
   (dt) => {
@@ -129,7 +159,8 @@ const loop = createLoop(
     world = step(world, { ...input.state, pulse: config.gather === 'pulse' ? pulse : false }, dt, config)
   },
   () => {
-    draw(ctx, world, config)
+    stepTrail()
+    draw(ctx, world, config, trail)
     const grew = world.asteroids.length > prevCount // motes split (heuristic: count grew)
     if (world.ship.pulseT < 0.05 && prevPulseT > 0.1) sfxPulse()
     if (grew) sfxShatter()

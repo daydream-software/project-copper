@@ -62,9 +62,10 @@ Each has a discriminating test.
 ### Slice M2 — mode pack: juice (done)
 
 Visual sandbox toggles, view/main side: **palette** (copper / mono / neon — `render.ts`
-PALETTES), **trails** (off / dust / full — the canvas fades toward the palette's exact
-bg; the charged-mote glow is off under trails so its halo doesn't accumulate into haze),
-**screen-shake** on shatters (`main.ts` jitters the canvas element). The
+PALETTES), **trails** (off / dust / full — **fading particles** over a fully-cleared
+canvas, so the background never leaks; dust is sparse grain, full a dense streak; the
+particle state lives in `main.ts`, drawn via `render.ts` `drawTrail`), **screen-shake**
+on shatters (`main.ts` jitters the canvas element). The
 audio-on-refresh gap is closed too: a music track the browser restores now starts on the
 first user gesture (`onFirstGesture` re-applies the panel), so the panel matches what
 plays.
