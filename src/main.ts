@@ -138,10 +138,21 @@ window.addEventListener('keydown', onFirstGesture, { once: true })
 function updateHint(): void {
   const parts = ['↑ thrust', '← → turn', config.gather === 'attract' ? 'hold space = attract' : 'tap space = gather pulse']
   if (config.scatter) parts.push('shift = scatter')
-  if (config.vortex) parts.push('space + shift = vortex (charge, release to fling)')
+  if (config.vortex) parts.push('space+shift = vortex (charge → fling)')
   if (config.gun) parts.push('F = fire')
   const hint = document.querySelector('#hint')
-  if (hint !== null) hint.textContent = parts.join(' · ')
+  if (hint === null) return
+  // Each part is a no-wrap span (carrying its own leading separator) with a breakable space
+  // between, so a line only ever wraps *between* hints — never mid-detail.
+  const nodes: Node[] = []
+  for (const [i, p] of parts.entries()) {
+    if (i > 0) nodes.push(document.createTextNode(' '))
+    const span = document.createElement('span')
+    span.className = 'seg'
+    span.textContent = (i > 0 ? '· ' : '') + p
+    nodes.push(span)
+  }
+  hint.replaceChildren(...nodes)
 }
 updateHint()
 syncEnablement()

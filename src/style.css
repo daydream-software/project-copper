@@ -59,6 +59,11 @@ main {
   user-select: none;
 }
 
+/* Each hint detail stays on one line; wrapping only happens between details. */
+#hint .seg {
+  white-space: nowrap;
+}
+
 /* Sandbox options panel — a fixed-width sidebar on the left (order:-1 puts it before
    the canvas in the flex row). Pinned to the top (align-self) at its natural height; it
    scrolls if it outgrows the viewport so every control (Reseed, SFX…) stays reachable. */
