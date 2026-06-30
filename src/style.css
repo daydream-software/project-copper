@@ -66,6 +66,22 @@ main {
   white-space: nowrap;
 }
 
+/* FPS readout — pinned top-right (panel is top-left, hint is bottom-right, so it clears
+   both). A UI-only overlay; tabular-nums keeps the digits from jittering as it ticks.
+   The `hidden` attribute (toggled by main.ts) hides it when the Display option is off. */
+#fps {
+  position: fixed;
+  top: 0.85rem;
+  right: 1rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  opacity: 0.6;
+  user-select: none;
+  pointer-events: none;
+}
+
 /* Sandbox options panel — a fixed-width sidebar on the left (order:-1 puts it before
    the canvas in the flex row). Pinned to the top (align-self) at its natural height; it
    scrolls if it outgrows the viewport so every control (Reseed, SFX…) stays reachable. */

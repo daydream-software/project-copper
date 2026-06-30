@@ -171,6 +171,37 @@ function applyAudio(): void {
   setSfxVolume(num('#opt-sfxVol', 0.8))
 }
 
+// The FPS counter is UI-only — like audio, it's deliberately kept out of Config and the
+// seed (so toggling it never changes the seed string). It's a DOM overlay, not canvas
+// text, so the canvas stays pure geometry. The Display checkbox shows/hides it; the loop
+// feeds it frame timings via updateFps().
+const fpsEl = document.querySelector<HTMLDivElement>('#fps')
+let showFps = false
+let fpsLast = 0 // performance.now() of the previous render frame, ms (0 = unseeded)
+let fpsEma = 0 // exponential moving average of the frame interval, ms (0 = unseeded)
+let fpsShownAt = 0 // last time the readout text was rewritten, ms
+
+function applyFps(): void {
+  showFps = checked('#opt-fps')
+  if (fpsEl !== null) fpsEl.hidden = !showFps
+  fpsLast = 0 // re-seed timing on toggle so the gap while it was off isn't counted as a frame
+}
+
+// Smooth the frame interval (EMA) and refresh the readout. Throttled to ~4×/s: a per-frame
+// rewrite would flicker and force needless reflow, while the EMA keeps the number stable.
+function updateFps(): void {
+  const now = performance.now()
+  if (fpsLast > 0) {
+    const dt = now - fpsLast
+    fpsEma = fpsEma === 0 ? dt : fpsEma + (dt - fpsEma) * 0.1
+  }
+  fpsLast = now
+  if (fpsEl !== null && fpsEma > 0 && now - fpsShownAt > 250) {
+    fpsShownAt = now
+    fpsEl.textContent = `${Math.round(1000 / fpsEma)} fps`
+  }
+}
+
 // Theme the DOM UI to the active palette: push the canvas palette's colours onto the CSS
 // variables the panel / hint / page background read, so switching palette recolours the
 // whole app, not just the drawn world.
@@ -224,6 +255,7 @@ function updateHint(): void {
 updateHint()
 syncEnablement()
 applyAudio()
+applyFps()
 applyArenaShape()
 applyPalette()
 
@@ -260,6 +292,7 @@ if (panel !== null) {
     updateHint()
     syncEnablement()
     applyAudio()
+    applyFps()
     applyArenaShape()
     applyPalette()
     // Blur the control so the next space/shift goes to the game, not the checkbox.
@@ -392,6 +425,7 @@ const loop = createLoop(
     stepTrail()
     stepShards()
     draw(ctx, world, config, grains, ghosts, shards)
+    if (showFps) updateFps() // UI-only overlay, measured per render frame (not per sim step)
     const grew = world.asteroids.length > prevCount // motes split (heuristic: count grew)
     if (world.ship.pulseT < 0.05 && prevPulseT > 0.1) sfxPulse()
     if (grew) sfxShatter()
