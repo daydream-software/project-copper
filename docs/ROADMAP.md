@@ -79,10 +79,18 @@ currents, in `stepMote`). Plus a **trail-motes** option: trails can apply to the
 only, or ship + motes (nested under Trails, disabled when trails are off). `step()`'s
 post-movement passes were factored into `reactMotes` to keep it flat.
 
+### Slice M4 — mode pack: arena (done)
+
+The arena `edges` mode grew from wrap/bounce to four: **kill** (motes die at the edge;
+the ship clamps — no game-over) and **circle** (a centred circular arena everything
+bounces off). The per-axis `edge` helper became a unified `bound()` in `geometry.ts`
+(rectangle axes or a circle reflection, returning a `dead` flag); the circle is drawn in
+`render.ts`. Panel "Arena" radio: Wrap / Bounce / Kill / Circle.
+
 ## Next — the open ladder (more mode packs)
 
 - **Pack: more charge** — bipolar +/- charge, overcharge→burst, stasis.
-- **Pack: arena** — circular arena, obstacles/walls, kill-edges.
+- **Arena extra** — static obstacles/pillars to bounce off.
 - **Pack: ship & juice** — ship collision (bounce, no game-over), dash, magnetic hull,
   debris particles on shatter (needs shatter positions from the sim).
 

@@ -35,9 +35,10 @@ function radio(name: string): string | undefined {
 function readPanel(): Config {
   const palette = radio('palette')
   const trails = radio('trails')
+  const edges = radio('edges')
   return {
     gather: radio('gather') === 'attract' ? 'attract' : 'pulse',
-    edges: radio('edges') === 'bounce' ? 'bounce' : 'wrap',
+    edges: edges === 'bounce' || edges === 'kill' || edges === 'circle' ? edges : 'wrap',
     scatter: checked('#opt-scatter'),
     vortex: checked('#opt-vortex'),
     gun: checked('#opt-gun'),

@@ -6,8 +6,9 @@
 export interface Config {
   /** What the gather key does: a discrete `pulse` (tap) or a continuous `attract` (hold). */
   gather: 'attract' | 'pulse'
-  /** Arena borders: entities `wrap` around (toroidal) or `bounce` off the edges. */
-  edges: 'bounce' | 'wrap'
+  /** Arena bounds: `wrap` (toroidal), `bounce` off the rectangle, `kill` motes at the
+   * edge, or a `circle` arena (everything bounces off a centred circle). */
+  edges: 'bounce' | 'circle' | 'kill' | 'wrap'
   /** Scatter (repel) enabled. */
   scatter: boolean
   /** Vortex (gather + scatter held) enabled. */

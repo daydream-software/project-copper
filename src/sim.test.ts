@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld, step } from './sim'
-import { edge, overlap, wrap } from './geometry'
+import { bound, overlap, wrap } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import type { Input, World } from './entities'
 
@@ -54,12 +54,17 @@ describe('geometry', () => {
     expect(overlap({ x: 0, y: 0 }, 5, { x: 0, y: 8 }, 2)).toBe(false) // gap 8 > 7
   })
 
-  it('edge wraps (velocity kept) or bounces (velocity flipped)', () => {
-    expect(edge(105, 5, 100, false)).toEqual({ p: 5, v: 5 })
-    expect(edge(-5, -3, 100, false)).toEqual({ p: 95, v: -3 })
-    expect(edge(105, 5, 100, true)).toEqual({ p: 95, v: -5 })
-    expect(edge(-5, -3, 100, true)).toEqual({ p: 5, v: 3 })
-    expect(edge(50, 5, 100, true)).toEqual({ p: 50, v: 5 }) // in-bounds untouched
+  it('bound wraps / bounces / kills against the rectangle', () => {
+    expect(bound(105, 50, 5, 0, 0, 100, 100, 'wrap')).toEqual({ x: 5, y: 50, vx: 5, vy: 0, dead: false })
+    expect(bound(105, 50, 5, 0, 0, 100, 100, 'bounce')).toEqual({ x: 95, y: 50, vx: -5, vy: 0, dead: false })
+    expect(bound(105, 50, 5, 0, 0, 100, 100, 'kill').dead).toBe(true)
+    expect(bound(50, 50, 5, 0, 0, 100, 100, 'kill').dead).toBe(false) // in bounds
+  })
+
+  it('bound reflects off the circle arena', () => {
+    const b = bound(110, 50, 10, 0, 0, 100, 100, 'circle') // outside the r=50 circle at (50,50)
+    expect(b.x).toBeLessThan(110) // pulled back onto the circle
+    expect(b.vx).toBeLessThan(0) // velocity reflected inward
   })
 })
 
@@ -297,6 +302,12 @@ describe('edges mode', () => {
     const w = step(makeWorld({ width: 800, asteroids: [fastMote] }), NONE, DT, cfg({ edges: 'bounce' }))
     expect(w.asteroids[0].vel.x).toBeLessThan(0)
     expect(w.asteroids[0].pos.x).toBeLessThan(800)
+  })
+
+  it('kill removes a mote that leaves the arena', () => {
+    const out = { pos: { x: 799, y: 300 }, vel: { x: 700, y: 0 }, radius: 31, angle: 0, spin: 0, shape: [], charge: 0 }
+    const w = step(makeWorld({ width: 800, height: 600, asteroids: [out] }), NONE, DT, cfg({ edges: 'kill' }))
+    expect(w.asteroids.every((a) => a.radius !== 31)).toBe(true) // the marked mote was culled (refills are r48)
   })
 })
 

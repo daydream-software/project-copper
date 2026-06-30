@@ -33,6 +33,14 @@ export function draw(ctx: CanvasRenderingContext2D, world: World, config: Config
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 
+  if (config.edges === 'circle') {
+    ctx.strokeStyle = active.dim
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.arc(world.width / 2, world.height / 2, Math.min(world.width, world.height) / 2, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+
   // Trails (drawn under the crisp world): full = faded shape outlines; dust = grains.
   if (config.trails === 'full') drawGhosts(ctx, ghosts)
   else if (config.trails === 'dust') drawGrains(ctx, grains)

@@ -3,7 +3,7 @@
 // (rng.ts) for all randomness, so a run is reproducible and directly unit-testable.
 
 import { makeRng, random, range, type Rng } from './rng'
-import { edge, makeShape, overlap, wrap, type Vec2 } from './geometry'
+import { bound, makeShape, overlap, wrap, type EdgeMode, type Vec2 } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import type { Asteroid, Bullet, FieldMode, Input, Ship, World } from './entities'
 
@@ -152,12 +152,12 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
   // releasing/scattering then flings the motes at whatever orbit speed was wound up.
   const field = fieldMode(input, config)
   const charge = field === 'vortex' ? Math.min(1, ship.charge + dt / CHARGE_TIME) : 0
-  const bounce = config.edges === 'bounce'
-  const ex = edge(ship.pos.x + vx * dt, vx, width, bounce)
-  const ey = edge(ship.pos.y + vy * dt, vy, height, bounce)
+  // The ship never dies at the edge (no game-over) — kill behaves like bounce for it.
+  const shipMode = config.edges === 'kill' ? 'bounce' : config.edges
+  const b = bound(ship.pos.x + vx * dt, ship.pos.y + vy * dt, vx, vy, SHIP_RADIUS, width, height, shipMode)
   return {
-    pos: { x: ex.p, y: ey.p },
-    vel: { x: ex.v, y: ey.v },
+    pos: { x: b.x, y: b.y },
+    vel: { x: b.vx, y: b.vy },
     angle,
     fireCooldown: Math.max(0, ship.fireCooldown - dt),
     thrusting: input.thrust,
@@ -225,7 +225,7 @@ function fieldForce(ship: Ship, a: Asteroid, dt: number): { vx: number, vy: numb
 
 // Drift a mote: polarity field, then gravity well + friction (sandbox toggles), clamp,
 // move + spin (wrapping or bouncing). The field touching it (re)charges it.
-function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number, config: Config): Asteroid {
+function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number, config: Config): Asteroid | null {
   const f = fieldForce(ship, a, dt)
   let { vx, vy } = f
   if (config.well) {
@@ -247,12 +247,12 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
     vx = (vx / speed) * MOTE_MAX_SPEED
     vy = (vy / speed) * MOTE_MAX_SPEED
   }
-  const ex = edge(a.pos.x + vx * dt, vx, width, config.edges === 'bounce')
-  const ey = edge(a.pos.y + vy * dt, vy, height, config.edges === 'bounce')
+  const b = bound(a.pos.x + vx * dt, a.pos.y + vy * dt, vx, vy, a.radius, width, height, config.edges)
+  if (b.dead) return null // killed at the edge (kill mode)
   return {
     ...a,
-    vel: { x: ex.v, y: ey.v },
-    pos: { x: ex.p, y: ey.p },
+    vel: { x: b.vx, y: b.vy },
+    pos: { x: b.x, y: b.y },
     angle: a.angle + a.spin * dt,
     charge: f.touched ? chargeTimeFor(a.radius) : Math.max(0, a.charge - dt),
   }
@@ -378,14 +378,14 @@ function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Ast
 }
 
 // Advance existing bullets, age them, cull the expired.
-function advanceBullets(bullets: Bullet[], width: number, height: number, dt: number, bounce: boolean): Bullet[] {
+function advanceBullets(bullets: Bullet[], width: number, height: number, dt: number, mode: EdgeMode): Bullet[] {
   const next: Bullet[] = []
-  for (const b of bullets) {
-    const ttl = b.ttl - dt
+  for (const bl of bullets) {
+    const ttl = bl.ttl - dt
     if (ttl <= 0) continue
-    const ex = edge(b.pos.x + b.vel.x * dt, b.vel.x, width, bounce)
-    const ey = edge(b.pos.y + b.vel.y * dt, b.vel.y, height, bounce)
-    next.push({ pos: { x: ex.p, y: ey.p }, vel: { x: ex.v, y: ey.v }, ttl })
+    const b = bound(bl.pos.x + bl.vel.x * dt, bl.pos.y + bl.vel.y * dt, bl.vel.x, bl.vel.y, BULLET_RADIUS, width, height, mode)
+    if (b.dead) continue
+    next.push({ pos: { x: b.x, y: b.y }, vel: { x: b.vx, y: b.vy }, ttl })
   }
   return next
 }
@@ -445,11 +445,10 @@ function reactMotes(rng: Rng, motes: Asteroid[], bullets: Bullet[], config: Conf
  * unaffected. */
 export function step(world: World, input: Input, dt: number, config: Config = DEFAULT_CONFIG): World {
   const rng = makeRng(world.rngState)
-  const bounce = config.edges === 'bounce'
   const ship = stepShip(world.ship, input, world.width, world.height, dt, config)
 
   // Advance bullets, then fire (arming the cooldown) if the gun is enabled and triggered.
-  const flying = advanceBullets(world.bullets, world.width, world.height, dt, bounce)
+  const flying = advanceBullets(world.bullets, world.width, world.height, dt, config.edges)
   const firing = config.gun && input.fire && ship.fireCooldown <= 0
   const bullets = firing ? [...flying, makeBullet(ship, world.width, world.height)] : flying
   const armed: Ship = firing ? { ...ship, fireCooldown: FIRE_COOLDOWN } : ship
@@ -457,7 +456,7 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
   // A gather pulse yanks motes inward first, then the continuous field + drift + wrap,
   // then the post-movement passes (repel / bounce / split / bullet hits / conduction).
   const kicked = input.pulse ? world.asteroids.map((a) => pulseKick(a, ship.pos)) : world.asteroids
-  const moved: Asteroid[] = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, config))
+  const moved = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, config)).filter((a): a is Asteroid => a !== null)
   const reacted = reactMotes(rng, moved, bullets, config, dt)
 
   // Keep the field populated (no game-over yet: it's a sandbox).
