@@ -24,12 +24,19 @@
         <label><input type="radio" name="gather" value="pulse" checked /> Pulse</label>
         <label><input type="radio" name="gather" value="attract" /> Attract (hold)</label>
       </fieldset>
+      <fieldset>
+        <legend>Edges</legend>
+        <label><input type="radio" name="edges" value="wrap" checked /> Wrap</label>
+        <label><input type="radio" name="edges" value="bounce" /> Bounce</label>
+      </fieldset>
       <label><input type="checkbox" id="opt-scatter" checked /> Scatter</label>
       <label><input type="checkbox" id="opt-vortex" checked /> Vortex</label>
       <label><input type="checkbox" id="opt-gun" /> Gun (press F)</label>
       <label><input type="checkbox" id="opt-chargedSplit" checked /> Charged motes split</label>
-      <label><input type="checkbox" id="opt-piercing" /> Piercing (charge persists)</label>
-      <label><input type="checkbox" id="opt-chainReaction" /> Chain reaction</label>
+      <div class="sub">
+        <label><input type="checkbox" id="opt-piercing" /> Piercing (charge persists)</label>
+        <label><input type="checkbox" id="opt-chainReaction" /> Chain reaction</label>
+      </div>
       <button id="opt-reseed" type="button">⟳ Reseed</button>
     </aside>
     <script type="module" src="/src/main.ts"></script>

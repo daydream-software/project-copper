@@ -94,6 +94,26 @@ main {
   cursor: pointer;
 }
 
+/* Nested sub-options (Piercing / Chain) hang off "Charged motes split" — a vertical
+   dependency line + indent. The whole group dims when the parent disables them. */
+#panel .sub {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-left: 0.5rem;
+  padding-left: 0.65rem;
+  border-left: 1px solid color-mix(in srgb, var(--copper-dim) 50%, transparent);
+}
+
+#panel .sub:has(input:disabled) {
+  opacity: 0.4;
+}
+
+#panel input:disabled,
+#panel input:disabled + * {
+  cursor: default;
+}
+
 #panel input {
   accent-color: var(--copper);
   cursor: pointer;

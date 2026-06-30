@@ -12,6 +12,18 @@ export function wrap(value: number, size: number): number {
   return ((value % size) + size) % size
 }
 
+/**
+ * Resolve one axis against the arena border. `wrap` mode folds the position around
+ * (velocity unchanged); `bounce` mode reflects it back in and flips the velocity.
+ * Moves per step are tiny vs. the arena, so a single reflection suffices.
+ */
+export function edge(p: number, v: number, size: number, bounce: boolean): { p: number, v: number } {
+  if (!bounce) return { p: wrap(p, size), v }
+  if (p < 0) return { p: -p, v: -v }
+  if (p > size) return { p: 2 * size - p, v: -v }
+  return { p, v }
+}
+
 /** Do two circles overlap? (squared-distance test, no sqrt.) */
 export function overlap(a: Vec2, ar: number, b: Vec2, br: number): boolean {
   const dx = a.x - b.x

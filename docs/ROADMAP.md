@@ -41,12 +41,14 @@ loop **gather → charge → fling → shatter**. (`sim.ts` `findMoteSplits` /
 A floating panel (`index.html` / `style.css`, wired in `main.ts`) toggles mechanics
 live via a `Config` (`config.ts`) passed to `step(world, input, dt, config)` —
 `DEFAULT_CONFIG` is the shipped behaviour so the default arg keeps existing callers
-unchanged. Toggles: gather **pulse vs continuous attract**, **scatter**, **vortex**,
-the **gun** (press F — the dormant bullets, re-enabled), **charged-mote split** (a
-charged hit shatters both motes), **piercing** (the charger survives & plows through
-instead of shattering), **chain reaction** (fragments born charged, bounded by
-`MAX_MOTES`), plus **reseed**. The on-screen hint tracks the config. Every toggle has a
-discriminating unit test.
+unchanged. Toggles: gather **pulse vs continuous attract**, **edges** (wrap vs bounce —
+`geometry.ts` `edge()`), **scatter**, **vortex**, the **gun** (press F — the dormant
+bullets, re-enabled), **charged-mote split** (a charged hit shatters both motes), and —
+nested under it with a dependency line, disabled when it's off — **piercing** (the
+charger survives & plows through) and **chain reaction** (fragments born charged,
+bounded by `MAX_MOTES`); plus **reseed**. The on-screen hint tracks the config. Charge
+duration scales with mote radius (`chargeTimeFor`). Every toggle has a discriminating
+unit test.
 
 ## Next — the open ladder (not built yet)
 

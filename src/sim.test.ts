@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld, step } from './sim'
-import { overlap, wrap } from './geometry'
+import { edge, overlap, wrap } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import type { Input, World } from './entities'
 
@@ -52,6 +52,14 @@ describe('geometry', () => {
   it('overlap is true only when circles intersect', () => {
     expect(overlap({ x: 0, y: 0 }, 5, { x: 0, y: 8 }, 4)).toBe(true) // gap 8 < 9
     expect(overlap({ x: 0, y: 0 }, 5, { x: 0, y: 8 }, 2)).toBe(false) // gap 8 > 7
+  })
+
+  it('edge wraps (velocity kept) or bounces (velocity flipped)', () => {
+    expect(edge(105, 5, 100, false)).toEqual({ p: 5, v: 5 })
+    expect(edge(-5, -3, 100, false)).toEqual({ p: 95, v: -3 })
+    expect(edge(105, 5, 100, true)).toEqual({ p: 95, v: -5 })
+    expect(edge(-5, -3, 100, true)).toEqual({ p: 5, v: 3 })
+    expect(edge(50, 5, 100, true)).toEqual({ p: 50, v: 5 }) // in-bounds untouched
   })
 })
 
@@ -184,6 +192,12 @@ describe('charged-mote collisions', () => {
     expect(w.asteroids[0].charge).toBeGreaterThan(0)
   })
 
+  it('charges bigger motes for longer (duration ∝ radius)', () => {
+    const big = step(makeWorld({ asteroids: [moteAt(500, 300, 48, 0)] }), press({ pulse: true }), DT)
+    const small = step(makeWorld({ asteroids: [moteAt(500, 300, 20, 0)] }), press({ pulse: true }), DT)
+    expect(big.asteroids[0].charge).toBeGreaterThan(small.asteroids[0].charge)
+  })
+
   it('a charged hit shatters both motes (the charger splits too)', () => {
     const w = step(makeWorld({ rngState: 99, asteroids: [moteAt(300, 300, 48, 2), moteAt(300, 300, 48, 0)] }), NONE, DT)
     expect(w.asteroids.filter((a) => a.radius < 40).length).toBeGreaterThanOrEqual(4) // two children from each mote
@@ -221,6 +235,26 @@ describe('sandbox config', () => {
   it('chainReaction=true spawns charged fragments', () => {
     const w = step(makeWorld({ asteroids: contact() }), NONE, DT, cfg({ chainReaction: true }))
     expect(w.asteroids.find((a) => a.radius < 40)?.charge ?? 0).toBeGreaterThan(0)
+  })
+})
+
+describe('edges mode', () => {
+  const fastShip = { pos: { x: 799, y: 300 }, vel: { x: 300, y: 0 }, angle: 0, fireCooldown: 0, thrusting: false, field: 'off' as const, charge: 0, pulseT: 99 }
+
+  it('bounce reflects the ship off the wall; wrap carries it across', () => {
+    const bounced = step(makeWorld({ width: 800, ship: { ...fastShip } }), NONE, DT, cfg({ edges: 'bounce' }))
+    expect(bounced.ship.vel.x).toBeLessThan(0)
+    expect(bounced.ship.pos.x).toBeLessThan(800)
+    const wrapped = step(makeWorld({ width: 800, ship: { ...fastShip } }), NONE, DT, cfg({ edges: 'wrap' }))
+    expect(wrapped.ship.vel.x).toBeGreaterThan(0)
+    expect(wrapped.ship.pos.x).toBeLessThan(10) // wrapped to the left side
+  })
+
+  it('bounce reflects a mote off the wall', () => {
+    const fastMote = { pos: { x: 799, y: 300 }, vel: { x: 200, y: 0 }, radius: 30, angle: 0, spin: 0, shape: [], charge: 0 }
+    const w = step(makeWorld({ width: 800, asteroids: [fastMote] }), NONE, DT, cfg({ edges: 'bounce' }))
+    expect(w.asteroids[0].vel.x).toBeLessThan(0)
+    expect(w.asteroids[0].pos.x).toBeLessThan(800)
   })
 })
 

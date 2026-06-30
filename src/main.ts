@@ -33,14 +33,26 @@ function checked(id: string): boolean {
 
 function readPanel(): Config {
   const gather = document.querySelector<HTMLInputElement>('input[name="gather"]:checked')?.value
+  const edges = document.querySelector<HTMLInputElement>('input[name="edges"]:checked')?.value
   return {
     gather: gather === 'attract' ? 'attract' : 'pulse',
+    edges: edges === 'bounce' ? 'bounce' : 'wrap',
     scatter: checked('#opt-scatter'),
     vortex: checked('#opt-vortex'),
     gun: checked('#opt-gun'),
     chargedSplit: checked('#opt-chargedSplit'),
     piercing: checked('#opt-piercing'),
     chainReaction: checked('#opt-chainReaction'),
+  }
+}
+
+// Piercing / chain reaction only matter when charged motes split, so disable them
+// (the panel dims the nested group) when that's off.
+function syncEnablement(): void {
+  const on = checked('#opt-chargedSplit')
+  for (const id of ['#opt-piercing', '#opt-chainReaction']) {
+    const el = document.querySelector<HTMLInputElement>(id)
+    if (el !== null) el.disabled = !on
   }
 }
 
@@ -54,12 +66,14 @@ function updateHint(): void {
   if (hint !== null) hint.textContent = parts.join(' · ')
 }
 updateHint()
+syncEnablement()
 
 const panel = document.querySelector<HTMLElement>('#panel')
 if (panel !== null) {
   panel.addEventListener('change', (e) => {
     config = readPanel()
     updateHint()
+    syncEnablement()
     // Blur the control so the next space/shift goes to the game, not the checkbox.
     if (e.target instanceof HTMLElement) e.target.blur()
   })

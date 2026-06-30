@@ -6,6 +6,8 @@
 export interface Config {
   /** What the gather key does: a discrete `pulse` (tap) or a continuous `attract` (hold). */
   gather: 'attract' | 'pulse'
+  /** Arena borders: entities `wrap` around (toroidal) or `bounce` off the edges. */
+  edges: 'bounce' | 'wrap'
   /** Scatter (repel) enabled. */
   scatter: boolean
   /** Vortex (gather + scatter held) enabled. */
@@ -22,6 +24,7 @@ export interface Config {
 
 export const DEFAULT_CONFIG: Config = {
   gather: 'pulse',
+  edges: 'wrap',
   scatter: true,
   vortex: true,
   gun: false,

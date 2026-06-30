@@ -3,7 +3,7 @@
 // (rng.ts) for all randomness, so a run is reproducible and directly unit-testable.
 
 import { makeRng, random, range, type Rng } from './rng'
-import { makeShape, overlap, wrap, type Vec2 } from './geometry'
+import { edge, makeShape, overlap, wrap, type Vec2 } from './geometry'
 import { DEFAULT_CONFIG, type Config } from './config'
 import type { Asteroid, Bullet, FieldMode, Input, Ship, World } from './entities'
 
@@ -47,8 +47,14 @@ const CHARGE_TIME = 1.4 // seconds of held vortex to reach full charge
 /** Reach of a gather pulse, px. Exported so the view can size the ripple. */
 export const PULSE_RANGE = 300
 const PULSE_STRENGTH = 380 // inward velocity kick at the centre, px/s (linear falloff to 0 at the edge)
-const MOTE_CHARGE_TIME = 2.5 // seconds a mote stays "charged" after the field touches it
+const MOTE_CHARGE_TIME = 2.5 // charge seconds at the base radius — scaled by size below
 const MAX_MOTES = 80 // safety cap so a chain reaction can't explode the field unboundedly
+
+// Charge lasts longer on bigger motes (proportional to radius): a base-size mote holds
+// MOTE_CHARGE_TIME, a small fragment proportionally less.
+function chargeTimeFor(radius: number): number {
+  return MOTE_CHARGE_TIME * (radius / ASTEROID_BASE_RADIUS)
+}
 
 function driftVel(rng: Rng, maxSpeed: number): Vec2 {
   const a = random(rng) * Math.PI * 2
@@ -138,9 +144,12 @@ function stepShip(ship: Ship, input: Input, width: number, height: number, dt: n
   // releasing/scattering then flings the motes at whatever orbit speed was wound up.
   const field = fieldMode(input, config)
   const charge = field === 'vortex' ? Math.min(1, ship.charge + dt / CHARGE_TIME) : 0
+  const bounce = config.edges === 'bounce'
+  const ex = edge(ship.pos.x + vx * dt, vx, width, bounce)
+  const ey = edge(ship.pos.y + vy * dt, vy, height, bounce)
   return {
-    pos: { x: wrap(ship.pos.x + vx * dt, width), y: wrap(ship.pos.y + vy * dt, height) },
-    vel: { x: vx, y: vy },
+    pos: { x: ex.p, y: ey.p },
+    vel: { x: ex.v, y: ey.v },
     angle,
     fireCooldown: Math.max(0, ship.fireCooldown - dt),
     thrusting: input.thrust,
@@ -168,7 +177,7 @@ function pulseKick(a: Asteroid, shipPos: Vec2): Asteroid {
   const dist = Math.hypot(dx, dy)
   if (dist === 0 || dist >= PULSE_RANGE) return a
   const kick = PULSE_STRENGTH * (1 - dist / PULSE_RANGE)
-  return { ...a, charge: MOTE_CHARGE_TIME, vel: { x: a.vel.x + (dx / dist) * kick, y: a.vel.y + (dy / dist) * kick } }
+  return { ...a, charge: chargeTimeFor(a.radius), vel: { x: a.vel.x + (dx / dist) * kick, y: a.vel.y + (dy / dist) * kick } }
 }
 
 // Vortex steers a mote's velocity toward a rotating shell — a spring toward
@@ -186,7 +195,7 @@ function vortexVel(ux: number, uy: number, dist: number, swirl: number, vx: numb
 
 // Drift a mote, apply the ship's polarity field, clamp its speed, then move + spin
 // it (wrapping).
-function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number): Asteroid {
+function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: number, bounce: boolean): Asteroid {
   let vx = a.vel.x
   let vy = a.vel.y
   let touched = false
@@ -216,13 +225,15 @@ function stepMote(a: Asteroid, ship: Ship, width: number, height: number, dt: nu
     vx = (vx / speed) * MOTE_MAX_SPEED
     vy = (vy / speed) * MOTE_MAX_SPEED
   }
+  const ex = edge(a.pos.x + vx * dt, vx, width, bounce)
+  const ey = edge(a.pos.y + vy * dt, vy, height, bounce)
   return {
     ...a,
-    vel: { x: vx, y: vy },
-    pos: { x: wrap(a.pos.x + vx * dt, width), y: wrap(a.pos.y + vy * dt, height) },
+    vel: { x: ex.v, y: ey.v },
+    pos: { x: ex.p, y: ey.p },
     angle: a.angle + a.spin * dt,
-    // The field touching a mote (re)charges it; otherwise the charge ebbs away.
-    charge: touched ? MOTE_CHARGE_TIME : Math.max(0, a.charge - dt),
+    // The field touching a mote (re)charges it (longer on bigger motes); else it ebbs.
+    charge: touched ? chargeTimeFor(a.radius) : Math.max(0, a.charge - dt),
   }
 }
 
@@ -248,14 +259,17 @@ function findMoteSplits(motes: Asteroid[]): { targets: Set<number>, chargers: Se
 function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Asteroid[] {
   if (motes.length >= MAX_MOTES) return motes // safety valve: stop splitting (chain guard)
   const { targets, chargers } = findMoteSplits(motes)
-  const childCharge = config.chainReaction ? MOTE_CHARGE_TIME : 0 // fragments born charged → cascade
   const out: Asteroid[] = []
   for (const [idx, m] of motes.entries()) {
     // Both motes shatter on a charged hit — including the charger itself, unless
     // piercing, where it survives whole (keeping its charge) and plows through.
     const shatters = targets.has(idx) || (chargers.has(idx) && !config.piercing)
     if (shatters) {
-      if (m.radius > ASTEROID_MIN_RADIUS) out.push(spawnChild(rng, m, childCharge), spawnChild(rng, m, childCharge))
+      if (m.radius > ASTEROID_MIN_RADIUS) {
+        // Chain reaction: fragments are born charged (duration scaled to their size).
+        const cc = config.chainReaction ? chargeTimeFor(m.radius * CHILD_SCALE) : 0
+        out.push(spawnChild(rng, m, cc), spawnChild(rng, m, cc))
+      }
       // else: destroyed at min size (same as a bullet hit)
     } else {
       out.push(m)
@@ -265,16 +279,14 @@ function resolveMoteCollisions(rng: Rng, motes: Asteroid[], config: Config): Ast
 }
 
 // Advance existing bullets, age them, cull the expired.
-function advanceBullets(bullets: Bullet[], width: number, height: number, dt: number): Bullet[] {
+function advanceBullets(bullets: Bullet[], width: number, height: number, dt: number, bounce: boolean): Bullet[] {
   const next: Bullet[] = []
   for (const b of bullets) {
     const ttl = b.ttl - dt
     if (ttl <= 0) continue
-    next.push({
-      pos: { x: wrap(b.pos.x + b.vel.x * dt, width), y: wrap(b.pos.y + b.vel.y * dt, height) },
-      vel: b.vel,
-      ttl,
-    })
+    const ex = edge(b.pos.x + b.vel.x * dt, b.vel.x, width, bounce)
+    const ey = edge(b.pos.y + b.vel.y * dt, b.vel.y, height, bounce)
+    next.push({ pos: { x: ex.p, y: ey.p }, vel: { x: ex.v, y: ey.v }, ttl })
   }
   return next
 }
@@ -323,10 +335,11 @@ function resolveCollisions(rng: Rng, bullets: Bullet[], asteroids: Asteroid[]): 
  * unaffected. */
 export function step(world: World, input: Input, dt: number, config: Config = DEFAULT_CONFIG): World {
   const rng = makeRng(world.rngState)
+  const bounce = config.edges === 'bounce'
   const ship = stepShip(world.ship, input, world.width, world.height, dt, config)
 
   // Advance bullets, then fire (arming the cooldown) if the gun is enabled and triggered.
-  const flying = advanceBullets(world.bullets, world.width, world.height, dt)
+  const flying = advanceBullets(world.bullets, world.width, world.height, dt, bounce)
   const firing = config.gun && input.fire && ship.fireCooldown <= 0
   const bullets = firing ? [...flying, makeBullet(ship, world.width, world.height)] : flying
   const armed: Ship = firing ? { ...ship, fireCooldown: FIRE_COOLDOWN } : ship
@@ -335,7 +348,7 @@ export function step(world: World, input: Input, dt: number, config: Config = DE
   // continuous field + drift + spin + wrap, then charged↔uncharged mote splits, and
   // finally any bullet hits.
   const kicked = input.pulse ? world.asteroids.map((a) => pulseKick(a, ship.pos)) : world.asteroids
-  const moved: Asteroid[] = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt))
+  const moved: Asteroid[] = kicked.map((a) => stepMote(a, ship, world.width, world.height, dt, bounce))
   const reacted = config.chargedSplit ? resolveMoteCollisions(rng, moved, config) : moved
   const hit = resolveCollisions(rng, bullets, reacted)
 
