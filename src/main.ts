@@ -33,6 +33,8 @@ const isTouch = window.matchMedia('(pointer: coarse)').matches
 const touch = isTouch ? createTouch() : null
 if (isTouch) {
   document.body.classList.add('touch')
+  // A long-press on the bare play area shouldn't pop the browser's context menu mid-game.
+  canvas.addEventListener('contextmenu', (e) => { e.preventDefault() })
   const toggle = document.createElement('button')
   toggle.className = 'panel-toggle'
   toggle.type = 'button'

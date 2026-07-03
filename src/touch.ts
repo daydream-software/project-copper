@@ -76,6 +76,10 @@ export function createTouch(host: HTMLElement = document.body): TouchHandle {
   root.append(zone, joy, actions)
   host.append(root)
 
+  // Holding a control is a long-press. CSS kills the iOS callout; this kills the long-press
+  // context menu (Android Chrome, and desktop emulation) so a held button never pops a menu.
+  root.addEventListener('contextmenu', (e) => { e.preventDefault() })
+
   // --- Joystick: floating — the base springs to wherever the left zone is first touched,
   // the thumb tracks the finger (clamped to JOY_MAX), both vanish on release. ---
   let joyId: number | null = null

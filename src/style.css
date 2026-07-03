@@ -282,6 +282,11 @@ body.touch #game {
   max-height: 100dvh;
   border-radius: 0;
   touch-action: none; /* no scroll / pinch-zoom / double-tap-zoom over the play area */
+  /* A held control (joystick / scatter / fire) is a long-press: kill the selection callout
+     and long-press context menu so holding a button never pops a menu on a real phone. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* The keyboard hint is meaningless without a keyboard — the on-screen controls speak for
@@ -361,6 +366,11 @@ body.panel-open .panel-scrim {
   inset: 0;
   z-index: 20;
   pointer-events: none;
+  /* Holding a control is a long-press — suppress the selection callout / long-press menu
+     so a real phone never interrupts a held joystick or button with a context menu. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* Left half is the joystick zone: touching anywhere in it springs the stick to that spot. */
