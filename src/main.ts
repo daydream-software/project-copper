@@ -44,7 +44,19 @@ if (isTouch) {
   scrim.className = 'panel-scrim'
   toggle.addEventListener('click', () => { document.body.classList.toggle('panel-open') })
   scrim.addEventListener('click', () => { document.body.classList.remove('panel-open') })
-  document.body.append(scrim, toggle)
+  // Orientation gate: a real orientation *lock* isn't possible on the mobile web (iOS Safari
+  // has no screen.orientation.lock at all), so instead cover the game with a "rotate to
+  // landscape" prompt whenever the device is in portrait. Pure CSS geometry (a phone outline
+  // that pivots); shown/hidden entirely by an (orientation: portrait) media query — no JS.
+  const gate = document.createElement('div')
+  gate.className = 'rotate-gate'
+  const gateIcon = document.createElement('div')
+  gateIcon.className = 'rotate-gate-icon'
+  const gateLabel = document.createElement('p')
+  gateLabel.className = 'rotate-gate-label'
+  gateLabel.textContent = 'Rotate to landscape'
+  gate.append(gateIcon, gateLabel)
+  document.body.append(scrim, toggle, gate)
 }
 
 function checked(id: string): boolean {

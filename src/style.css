@@ -448,3 +448,76 @@ body.panel-open .panel-scrim {
   background: color-mix(in srgb, var(--accent) 78%, transparent);
   border-color: var(--accent);
 }
+
+/* Orientation gate — the game is landscape-only on touch. A true orientation lock isn't
+   available on the mobile web, so cover everything with a "rotate" prompt while in portrait.
+   Hidden by default; the (orientation: portrait) query below reveals it on touch devices. */
+.rotate-gate {
+  display: none;
+}
+
+@media (orientation: portrait) {
+  body.touch .rotate-gate {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 60; /* above the panel (40), its toggle (45) and the controls (20) */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 2rem;
+    text-align: center;
+    color: var(--accent);
+    background: var(--bg);
+    /* Respect the notch so nothing sits under it while the prompt is up. */
+    padding-top: max(2rem, env(safe-area-inset-top));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* A phone outline (portrait) that periodically pivots to landscape — reads as "rotate me"
+   without any arrow glyph. Pure geometry, themed via currentColor. */
+.rotate-gate-icon {
+  width: 44px;
+  height: 68px;
+  border: 3px solid currentColor;
+  border-radius: 9px;
+  animation: rotate-hint 2.4s ease-in-out infinite;
+}
+
+/* The little speaker slit, so the rectangle reads as a phone. */
+.rotate-gate-icon::before {
+  content: "";
+  display: block;
+  width: 12px;
+  height: 3px;
+  margin: 7px auto 0;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+@keyframes rotate-hint {
+  0%, 28% {
+    transform: rotate(0deg);
+  }
+  62%, 100% {
+    transform: rotate(-90deg);
+  }
+}
+
+.rotate-gate-label {
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+/* Users who ask the browser not to animate get a static tilted phone instead of a loop. */
+@media (prefers-reduced-motion: reduce) {
+  .rotate-gate-icon {
+    animation: none;
+    transform: rotate(-90deg);
+  }
+}
