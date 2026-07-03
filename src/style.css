@@ -260,3 +260,181 @@ main {
 #panel button:hover {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
+
+/* ─── Touch (coarse pointer) ─────────────────────────────────────────────────────────
+   Everything below is gated on `body.touch`, which main.ts only adds on a coarse pointer.
+   Desktop never sees any of it, so the fine-pointer experience is byte-for-byte unchanged.
+   The layout goes full-screen (canvas fills the viewport, the sidebar becomes a drawer)
+   and touch.ts's joystick + action buttons overlay the corners. */
+body.touch {
+  overflow: hidden; /* the world is on the canvas; nothing else should scroll */
+  overscroll-behavior: none; /* kill pull-to-refresh / rubber-banding */
+}
+
+/* Canvas fills the screen: the 720×720 world stays square (so the sim/seed are untouched),
+   it just scales to the viewport width and centres, letterboxed in the background colour. */
+body.touch main {
+  padding: 0;
+}
+
+body.touch #game {
+  max-width: 100vw;
+  max-height: 100dvh;
+  border-radius: 0;
+  touch-action: none; /* no scroll / pinch-zoom / double-tap-zoom over the play area */
+}
+
+/* The keyboard hint is meaningless without a keyboard — the on-screen controls speak for
+   themselves. Hide it on touch. */
+body.touch #hint {
+  display: none;
+}
+
+/* Sidebar → left drawer, off-screen until the ⚙ toggle opens it. Slides over the canvas. */
+body.touch #panel {
+  position: fixed;
+  inset: 0 auto 0 0;
+  margin: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  width: min(86vw, 320px);
+  border-radius: 0;
+  z-index: 40;
+  transform: translateX(-102%);
+  transition: transform 0.22s ease;
+  touch-action: pan-y; /* the drawer itself still scrolls through its options */
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-left: max(0.9rem, env(safe-area-inset-left));
+}
+
+body.touch.panel-open #panel {
+  transform: none;
+}
+
+/* ⚙ toggle — a small round button, top-left, over the letterbox. Hidden while the drawer
+   is open (tap the scrim to close). */
+.panel-toggle {
+  position: fixed;
+  top: max(0.6rem, env(safe-area-inset-top));
+  left: max(0.6rem, env(safe-area-inset-left));
+  z-index: 45;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dim) 45%, transparent);
+  border-radius: 50%;
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+body.panel-open .panel-toggle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Dim scrim behind the open drawer; tapping it closes the panel. */
+.panel-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  background: color-mix(in srgb, #000 55%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
+body.panel-open .panel-scrim {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Touch controls overlay — a full-screen layer that passes clicks through (pointer-events
+   none) except on its interactive children. Built by touch.ts, only present on touch. */
+.touch-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* Left half is the joystick zone: touching anywhere in it springs the stick to that spot. */
+.touch-joy-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 45%;
+  height: 100%;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* The floating stick: touch.ts pins .touch-joy's centre to the touch point (left/top +
+   translate(-50%,-50%)); the thumb translates within it as the finger moves. */
+.touch-joy {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.touch-joy-base {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  border: 2px solid var(--dim);
+  background: color-mix(in srgb, var(--bg) 30%, transparent);
+  opacity: 0.5;
+}
+
+.touch-joy-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px; /* centre on the base, then translate() offsets it */
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* Action buttons — bottom-right, right thumb. Gather is lowest (primary); scatter above.
+   Hold both together = vortex (same as space + shift). */
+.touch-actions {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1.4rem, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  pointer-events: none;
+}
+
+.touch-btn {
+  pointer-events: auto;
+  touch-action: none;
+  width: 5.4rem;
+  height: 3.2rem;
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border: 2px solid color-mix(in srgb, var(--dim) 60%, transparent);
+  border-radius: 1.6rem;
+  backdrop-filter: blur(2px);
+  opacity: 0.9;
+  cursor: pointer;
+}
+
+.touch-btn:active {
+  color: var(--bg);
+  background: color-mix(in srgb, var(--accent) 78%, transparent);
+  border-color: var(--accent);
+}

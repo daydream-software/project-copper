@@ -7,9 +7,10 @@ import { decodeSeed, encodeSeed } from './seed'
 import type { Config } from './config'
 import { draw, paletteFor, type Ghost, type Shard, type TrailDot } from './render'
 import { createInput } from './input'
+import { createTouch, type TouchHandle } from './touch'
 import { createLoop } from './loop'
 import { resumeAudio, setMusic, setMusicVolume, setSfxVolume, sfxPulse, sfxShatter } from './audio'
-import type { World } from './entities'
+import type { Input, World } from './entities'
 
 function readSeed(): number {
   const param = new URLSearchParams(window.location.search).get('seed')
@@ -23,6 +24,26 @@ const ctx = canvas.getContext('2d')
 if (ctx === null) throw new Error('2d context unavailable')
 
 const input = createInput(window)
+
+// On a coarse pointer (phone/tablet) there's no keyboard, so the game is unplayable
+// without touch controls. Add a floating joystick + action buttons (touch.ts), and turn
+// the always-open sidebar into a drawer behind a ⚙ toggle so the canvas gets the screen.
+// Desktop (a fine pointer) is left byte-for-byte unchanged: none of this runs.
+const isTouch = window.matchMedia('(pointer: coarse)').matches
+const touch = isTouch ? createTouch() : null
+if (isTouch) {
+  document.body.classList.add('touch')
+  const toggle = document.createElement('button')
+  toggle.className = 'panel-toggle'
+  toggle.type = 'button'
+  toggle.setAttribute('aria-label', 'settings')
+  toggle.textContent = '⚙' // ⚙
+  const scrim = document.createElement('div')
+  scrim.className = 'panel-scrim'
+  toggle.addEventListener('click', () => { document.body.classList.toggle('panel-open') })
+  scrim.addEventListener('click', () => { document.body.classList.remove('panel-open') })
+  document.body.append(scrim, toggle)
+}
 
 function checked(id: string): boolean {
   return document.querySelector<HTMLInputElement>(id)?.checked ?? false
@@ -427,12 +448,42 @@ function stepTrail(): void {
   if (ghosts.length > GHOST_MAX) ghosts = ghosts.slice(-GHOST_MAX)
 }
 
+// The joystick's steer/thrust contribution: it turns the push direction into a target
+// heading (0 = up), compares it to the ship's angle, and nudges turnLeft/turnRight toward
+// it; a firm push also thrusts. Below a small deadzone the stick contributes nothing.
+function stickTurn(t: TouchHandle | null, shipAngle: number): { thrust: boolean, left: boolean, right: boolean } {
+  if (t === null || !t.stick.active || t.stick.mag <= 0.18) return { thrust: false, left: false, right: false }
+  const target = Math.atan2(t.stick.dx, -t.stick.dy) // stick push → heading (0 = up)
+  const diff = Math.atan2(Math.sin(target - shipAngle), Math.cos(target - shipAngle)) // shortest signed turn
+  return { thrust: t.stick.mag > 0.35, left: diff < -0.12, right: diff > 0.12 }
+}
+
+// Fold the optional touch controls into the keyboard intent for one step: the joystick
+// ORs into thrust/turn, the buttons into attract/repel (hold both = vortex, like space +
+// shift). No sim change — same Input shape, so sim.ts stays untouched and deterministic.
+function mergeInput(kb: Input, t: TouchHandle | null, shipAngle: number): Input {
+  const s = stickTurn(t, shipAngle)
+  const btn = t?.buttons ?? { attract: false, repel: false }
+  return {
+    thrust: kb.thrust || s.thrust,
+    turnLeft: kb.turnLeft || s.left,
+    turnRight: kb.turnRight || s.right,
+    attract: kb.attract || btn.attract,
+    repel: kb.repel || btn.repel,
+    fire: kb.fire,
+    pulse: false,
+  }
+}
+
 const loop = createLoop(
   (dt) => {
-    // Always drain the pulse so a queued one doesn't fire on switching back to pulse;
-    // only feed it to the sim when gather is in pulse mode.
-    const pulse = input.consumePulse()
-    world = step(world, { ...input.state, pulse: config.gather === 'pulse' ? pulse : false }, dt, config)
+    const merged = mergeInput(input.state, touch, world.ship.angle)
+    // Always drain both pulse sources (no short-circuit) so a queued one doesn't linger
+    // and fire later; only feed it to the sim when gather is in pulse mode.
+    const kbPulse = input.consumePulse()
+    const touchPulse = touch?.consumePulse() ?? false
+    const pulse = kbPulse || touchPulse
+    world = step(world, { ...merged, pulse: config.gather === 'pulse' ? pulse : false }, dt, config)
     // Spawn debris here (per fixed step), not in render: a shatter in a caught-up sub-step
     // is otherwise overwritten before the next draw and its debris would be lost.
     if (config.debris) for (const c of world.shatters) spawnShards(c.x, c.y)
