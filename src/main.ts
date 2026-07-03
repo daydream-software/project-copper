@@ -197,6 +197,7 @@ function syncEnablement(): void {
   const custom = checked('#opt-customPalette')
   disable('#opt-customBg', !custom) // colour pickers only matter with the custom palette on
   disable('#opt-customFront', !custom)
+  touch?.setGunButton(checked('#opt-gun')) // the mobile FIRE button follows the Gun toggle
 }
 
 // Read the music/SFX controls (separate from the sim Config — audio is output only, so it's
@@ -463,14 +464,14 @@ function stickTurn(t: TouchHandle | null, shipAngle: number): { thrust: boolean,
 // shift). No sim change — same Input shape, so sim.ts stays untouched and deterministic.
 function mergeInput(kb: Input, t: TouchHandle | null, shipAngle: number): Input {
   const s = stickTurn(t, shipAngle)
-  const btn = t?.buttons ?? { attract: false, repel: false }
+  const btn = t?.buttons ?? { attract: false, repel: false, fire: false }
   return {
     thrust: kb.thrust || s.thrust,
     turnLeft: kb.turnLeft || s.left,
     turnRight: kb.turnRight || s.right,
     attract: kb.attract || btn.attract,
     repel: kb.repel || btn.repel,
-    fire: kb.fire,
+    fire: kb.fire || btn.fire,
     pulse: false,
   }
 }

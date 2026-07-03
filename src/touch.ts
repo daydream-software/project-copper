@@ -21,11 +21,15 @@ export interface TouchStick {
 
 export interface TouchHandle {
   readonly stick: TouchStick
-  /** Held state of the two action buttons (attract = gather key, repel = scatter). */
-  readonly buttons: { attract: boolean, repel: boolean }
+  /** Held state of the action buttons (attract = gather key, repel = scatter, fire = the
+   *  dormant gun's F key — only reachable while its button is shown). */
+  readonly buttons: { attract: boolean, repel: boolean, fire: boolean }
   /** True once per fresh gather tap (suppressed while scatter is held — that's a vortex,
    *  not a pulse), then clears. Drained once per fixed step, like input.consumePulse(). */
   consumePulse: () => boolean
+  /** Show/hide the FIRE button, mirroring the panel's Gun toggle (off → no gun, no button —
+   *  same as desktop, where F does nothing until Gun is enabled). */
+  setGunButton: (on: boolean) => void
   dispose: () => void
 }
 
@@ -33,7 +37,7 @@ const JOY_MAX = 56 // px the thumb travels from the base centre at full push
 
 export function createTouch(host: HTMLElement = document.body): TouchHandle {
   const stick: TouchStick = { active: false, mag: 0, dx: 0, dy: 0 }
-  const buttons = { attract: false, repel: false }
+  const buttons = { attract: false, repel: false, fire: false }
   let pendingPulse = false
 
   // --- DOM (built here so index.html stays desktop-only; created only on touch) ---
@@ -54,6 +58,11 @@ export function createTouch(host: HTMLElement = document.body): TouchHandle {
 
   const actions = document.createElement('div')
   actions.className = 'touch-actions'
+  const fire = document.createElement('button')
+  fire.className = 'touch-btn'
+  fire.type = 'button'
+  fire.textContent = 'fire'
+  fire.hidden = true // only shown when the sandbox's Gun option is on (setGunButton)
   const scatter = document.createElement('button')
   scatter.className = 'touch-btn'
   scatter.type = 'button'
@@ -62,7 +71,7 @@ export function createTouch(host: HTMLElement = document.body): TouchHandle {
   gather.className = 'touch-btn'
   gather.type = 'button'
   gather.textContent = 'gather'
-  actions.append(scatter, gather) // gather sits lowest — the primary, easiest-reach button
+  actions.append(fire, scatter, gather) // gather sits lowest — the primary, easiest-reach button
 
   root.append(zone, joy, actions)
   host.append(root)
@@ -129,26 +138,28 @@ export function createTouch(host: HTMLElement = document.body): TouchHandle {
   // --- Action buttons: press = hold, release = let go. A gather press queues a pulse
   // only when scatter isn't already held (holding both is a vortex, not a stray pulse) —
   // mirroring the keyboard's space-with-shift rule in input.ts. ---
-  const press = (which: 'gather' | 'scatter') => (e: PointerEvent): void => {
+  const press = (which: 'gather' | 'scatter' | 'fire') => (e: PointerEvent): void => {
     if (which === 'gather') {
       if (!buttons.repel) pendingPulse = true
       buttons.attract = true
-    } else {
+    } else if (which === 'scatter') {
       buttons.repel = true
+    } else {
+      buttons.fire = true // held → the sim auto-repeats shots while down, like the F key
     }
     if (e.currentTarget instanceof HTMLElement) e.currentTarget.setPointerCapture(e.pointerId)
     e.preventDefault() // no synthetic click, no focus stealing, no double-tap zoom
   }
-  const release = (which: 'gather' | 'scatter') => (): void => {
+  const release = (which: 'gather' | 'scatter' | 'fire') => (): void => {
     if (which === 'gather') buttons.attract = false
-    else buttons.repel = false
+    else if (which === 'scatter') buttons.repel = false
+    else buttons.fire = false
   }
-  gather.addEventListener('pointerdown', press('gather'))
-  gather.addEventListener('pointerup', release('gather'))
-  gather.addEventListener('pointercancel', release('gather'))
-  scatter.addEventListener('pointerdown', press('scatter'))
-  scatter.addEventListener('pointerup', release('scatter'))
-  scatter.addEventListener('pointercancel', release('scatter'))
+  for (const [btn, which] of [[gather, 'gather'], [scatter, 'scatter'], [fire, 'fire']] as const) {
+    btn.addEventListener('pointerdown', press(which))
+    btn.addEventListener('pointerup', release(which))
+    btn.addEventListener('pointercancel', release(which))
+  }
 
   return {
     stick,
@@ -157,6 +168,10 @@ export function createTouch(host: HTMLElement = document.body): TouchHandle {
       const p = pendingPulse
       pendingPulse = false
       return p
+    },
+    setGunButton: (on: boolean): void => {
+      fire.hidden = !on
+      if (!on) buttons.fire = false // clear a stuck hold if the gun is switched off mid-press
     },
     dispose: (): void => {
       root.remove() // listeners are on the removed nodes, so they go with them
